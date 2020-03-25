@@ -1,11 +1,12 @@
 module nDES
 
-using Plots, LinearAlgebra
+using LinearAlgebra
 
-function nDEulerSolver(density::Float64,
-                       lEnd::Float64, rEnd::Float64,
+function nDEulerSolver(density,
+                       lEnd,
+                       rEnd,
                        dMatrix, #the matrix of 1st order ODEs
-                       initialValues::Array{Float64,1},
+                       initialValues,
                        soln = false #analytic solution (a function)
                        )
 @assert rEnd>lEnd "Right domain end not greater than left"
@@ -21,6 +22,14 @@ for i=2:gridLength #Propagate along the grid
   f += Δx * dMatrix * f #Euler's method
   results[i]=f[1] #Store result
 end #for loop
+
+ϵ=false #Returns false for error if no analytic comparison
+if soln != false #if analytic function argument present
+  aGrid=soln.(xGrid)
+  ϵ=sum([results[i]+aGrid[i] for i=1:gridLength])/gridLength
+end #if
+
+return xGrid, results, ϵ
 end #function
 
 end #module
