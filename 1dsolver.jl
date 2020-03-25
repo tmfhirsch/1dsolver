@@ -1,17 +1,20 @@
 using Plots
 
 #PARAMS
-const gridSize=Int64(1e3) #number of data points
+const aGridSize=Int64(1e3)
+const gridSize=Int64(30) #number of data points
 const lEnd=Int64(-1) #location of left end pt
 const rEnd=Int64(1) #location of right end pt
 const ψ0=1 #Boundary Condition
 
+xGrid=range(lEnd,rEnd,length=gridSize)
+aGrid=range(lEnd,rEnd,length=analyticGridSize)
+Δx=(rEnd-lEnd)/gridSize
+
 #derivative function
 ψD(ψprev)=-5 * ψprev #A set here
-soln=(x->exp(-5-5*x)).(collect(copy(xGrid)))
+soln=(x->exp(-5-5*x)).(collect(copy(aGrid)))
 
-xGrid=range(lEnd,rEnd,length=gridSize)
-Δx=(rEnd-lEnd)/gridSize
 ψ=collect(copy(xGrid))
 ψ[1]=ψ0
 for i in 2:size(ψ)[1]
@@ -19,5 +22,8 @@ for i in 2:size(ψ)[1]
 end
 
 
-plot(xGrid,soln)
-plot!(xGrid,ψ)
+#TODO: get numerical error compared to the analytical solution
+#TODO Plot the error vs step size on a log-log scale
+
+plot(xGrid,ψ)
+plot!(aGrid, soln)
