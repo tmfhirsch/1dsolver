@@ -22,8 +22,5 @@ for i in 2:size(ψ)[1]
 end
 
 
-#TODO: get numerical error compared to the analytical solution
-#TODO Plot the error vs step size on a log-log scale
-
 plot(xGrid,ψ)
 plot!(aGrid, soln)
