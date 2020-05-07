@@ -31,7 +31,7 @@ function nDEulerSolver(flag, #flag density or step size
     ϵ=false #Returns false for error if no analytic comparison
     if soln != false #if analytic function argument present
         aGrid=soln.(xGrid)
-        ϵ=sum([results[i]+aGrid[i] for i=1:gridLength])/gridLength
+        ϵ=sum([abs(results[i]-aGrid[i]) for i=1:gridLength])/gridLength
     end #if
     return xGrid, results, ϵ
 end #function

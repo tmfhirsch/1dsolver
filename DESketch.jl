@@ -17,39 +17,56 @@ function expDecayExample()
     plot!(grid,expAnalytic.(grid))
 end
 
-# Conservation of population example
-consMatrix=zeros(Float64,(2,2))
-consMatrix[1,2],consMatrix[2,1]=1,-1
-consInitial=[2,-1]
-consAnalytic=(x->-sin(x)+2*cos(x))
-consDensity,consLeft,consRight=100,0,2*π
+# Conservation example
+consMatrix=zeros(Float64,(4,4))
+consMatrix[1,3],consMatrix[2,3]=1,-1
+consMatrix[3,3],consMatrix[4,3]=-1,1
+consInitial=[0,0,1,1]
+consAnalytic=(x->1-exp(-x))
+consDensity,consLeft,consRight=Int(1e6),0,10
 
-function consDecayExample()
+function consExample()
     grid,res,err=nDEulerSolver('d',consDensity,consLeft,consRight,consMatrix,consInitial,consAnalytic)
     print("Error = $err\n")
     plot(grid,res)
     plot!(grid,consAnalytic.(grid))
 end
 
+# Wave example
+waveMatrix=zeros(Float64,(2,2))
+waveMatrix[1,2],waveMatrix[2,1]=1,-1
+waveInitial=[2,-1]
+waveAnalytic=(x->-sin(x)+2*cos(x))
+waveDensity,waveLeft,waveRight=Int(1e6),0,2*π
+
+function waveExample()
+    grid,res,err=nDEulerSolver('d',waveDensity,waveLeft,waveRight,waveMatrix,waveInitial,waveAnalytic)
+    print("Error = $err\n")
+    plot(grid,res)
+    plot!(grid,waveAnalytic.(grid))
+end
+
 function iterator(key::String,lΔ,uΔ,nΔ)
-    ΔGrid=range(lΔ,uΔ,length=nΔ)
-    @assert key in ["exp","cons"] "Invalid key: $key"
+    ΔGrid=range(lΔ,uΔ,length=Int(nΔ))
+    @assert key in ["exp","wave","cons"] "Invalid key: $key"
     errors=[]
     if key == "exp" #Exponential example
         for Δ in ΔGrid
             grid,res,err=nDEulerSolver('s',Δ,expLeft,expRight,expMatrix,expInitial,expAnalytic)
             push!(errors,err)
         end
-        plot(ΔGrid,errors,xaxis=:log,yaxis=:log,
-        xlabel="Step size", ylabel="Average error",
-        title="$key n-dim Euler's Method solver")
-    else #Conservation of population/Wave equation example
+    elseif key == "wave" #Wave equation example
+        for Δ in ΔGrid
+            grid,res,err=nDEulerSolver('s',Δ,waveLeft,waveRight,waveMatrix,waveInitial,waveAnalytic)
+            push!(errors,err)
+        end
+    else #conservation example
         for Δ in ΔGrid
             grid,res,err=nDEulerSolver('s',Δ,consLeft,consRight,consMatrix,consInitial,consAnalytic)
             push!(errors,err)
         end
-        plot(ΔGrid,errors,xaxis=:log,yaxis=:log,
-        xlabel="Step size", ylabel="Average error",
-        title="$key n-dim Euler's Method solver, n=$nΔ")
     end
+    plot(ΔGrid,errors,xaxis=:log,yaxis=:log,
+    xlabel="Step size", ylabel="Average error",
+    title="$key n-dim Euler's Method solver, n=$nΔ")
 end
