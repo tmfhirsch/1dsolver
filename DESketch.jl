@@ -1,3 +1,5 @@
+#Demonstrated my Euler's method solver and the DifferentialEquations.jl package
+
 push!(LOAD_PATH, pwd())
 using nDES: nDEulerSolver
 using DifferentialEquations
