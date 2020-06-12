@@ -1,6 +1,6 @@
 # 1dsolver
 25/3/2020
-Repository for my work on DEs.
+Repository for my early learning coding with DEs.
 
 Contains:
 
@@ -8,4 +8,8 @@ nDES: n-dimensional Euler's method ODE solver, created as a proof of understandi
 
 1dsolve: Horrific, hard coded solver of the exponential decay problem
 
-DESketch: sketch file for playing with other code/producing plots
+DESketch: playing with N dimensional Euler's method solver
+and DifferentialEquations.jl package on three simple ODEs
+
+StepPot: Applying DifferentialEquations.jl to the simple
+problem of a rectangular step potential. This is the first attempt at solving the Schroedinger equation numerically
