@@ -1,3 +1,5 @@
+#An extremely basic Euler's method solver for a 1D exponential decay ODE.
+#This was the first code I wrote to try working with differential eqn solvers.
 using Plots
 
 #PARAMS
