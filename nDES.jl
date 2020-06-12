@@ -1,3 +1,4 @@
+#n Dimensional Euler method differential equation solver
 module nDES
 
 using LinearAlgebra

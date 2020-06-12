@@ -1,5 +1,6 @@
 push!(LOAD_PATH, pwd())
 using nDES: nDEulerSolver
+using DifferentialEquations
 using Plots
 
 
@@ -70,3 +71,39 @@ function iterator(key::String,lΔ,uΔ,nΔ)
     xlabel="Step size", ylabel="Average error",
     title="$key n-dim Euler's Method solver, n=$nΔ")
 end
+
+################################################################################
+#Now: repeat previous plots with the DifferentialEquations.jl package
+function expDecay!(du,u,p,t)
+    du[1]=-5u[1]
+end
+exp0 = [1.0]
+expSpan=(-1.,10.)
+expProb=ODEProblem(expDecay!,exp0,expSpan)
+expSol=solve(expProb)
+expPlot=plot(expSol,title="Exponential Decay solved using DE.jl", fmt = :pdf)
+#savefig(expPlot, "expPlot_DE-package.pdf")
+
+function transfer!(du,u,p,t)
+    #u=[f,g]
+    du[1] = -u[1] #f'=-f
+    du[2] = u[1]   #g'= f
+end
+tr0 = [1.0;0.0] #f(0)=1, g(0)=0
+trSpan = (0.,10.)
+trProb=ODEProblem(transfer!,tr0,trSpan)
+trSol=solve(trProb)
+trPlot=plot(trSol,title="Transfer problem solved using DE.jl", fmt = :pdf)
+#savefig(trPlot, "trPlot_DE-package.pdf")
+
+function wave!(du,u,p,t)
+    #u=[f,g]
+    du[1] = u[2]
+    du[2] = -u[1]
+end
+wave0 = [2.,-1.]
+waveSpan = (0,2π)
+waveProb=ODEProblem(wave!,wave0,waveSpan)
+waveSol=solve(waveProb)
+wavePlot=plot(waveSol,title="Wave equatoin solved using De.jl", fmt = :pdf)
+#savefig(wavePlot, "wavePlot_DE-package.pdf")
