@@ -3,15 +3,14 @@ Improved version of the Step Potential Code.
 Input: Initial conditions, in form of [a,b] ~ [ψ,ψ']
 Optional inputs: Potential (defaults to asymmetric double step potential);
     start and end points (defaults to 0,10);
-    location of ICs (defaults to 0);
     m, ħ, ϵ (=Energy) (defaults to 1,1,1);
     functions of (k,x) to match coefficients to (defaults to exp(±ikx)).
 Output: named tuple of matching coefficients (cf1, cf2) and wavefunct (wav)
 Output: [(A,B),(A,B)] such that ψ=A{fn1} + B{fm2}, at each end of xrange.
-Description last updated 8/07/20
+Description last updated 9/07/20
 =#
 cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
-using Plots, OrdinaryDiffEq
+using Plots, OrdinaryDiffEq, LinearAlgebra
 using UnPack
 using Revise
 
@@ -27,59 +26,99 @@ function asym_double_well(r; start=5, width=1, sep=1.2, h1=6, h2=10)::Float64
     return 0
 end
 
-#Main function
-function coeffs(IC;
-                V = asym_double_well,
-                ϵ=1.0, m=1.0, ħ=1.0,
-                limits=(-10.,20.0),
-                IC_loc=0.0,
-                fn1="plane wave",
-                fn2="plane wave",
-                fD1="plane wave",
-                fD2="plane wave",
-                )
-    k=sqrt(2*m*ϵ/ħ)
-    if fn1 == "plane wave"
-        func1(k,t) = exp(im*k*t) # defaults to exp(+i k x)
-    else
-        func1 = fn1
-    end
-    if fn2 == "plane wave"
-        func2(k,t) = exp(-im*k*t) # defaults to exp(-i k x)
-    else
-        func2 = fn2
-    end
-    if fD1 == "plane wave"
-        funD1(k,t) = im*k*exp(im*k*t) # defaults to +i k exp (+i k x)
-    else
-        funD1 = fD1
-    end
-    if fD2 == "plane wave"
-        funD2(k,t) = -im*k*exp(-im*k*t) # defaults to -i k exp (-i k x)
-    else
-        funD2 = fD2
-    end
-
+#=TISE solver, does the differential equations work
+Inputs: energy; potential, other constants, limits
+Output: matrix relating (ψ,ψ') on RHS to ICs=#
+function schrodinger_solver(V, #potential
+                            ϵ, #energy
+                            m, #mass
+                            ħ, #planck's constant
+                            limits #limits
+                            )
+    k=sqrt(2*m*ϵ)/ħ
     function TISE!(du,u,p,x) # TISE gives (ψ,ψ')'=f((ψ,ψ'))
         du[1]=u[2] # ψ'(x)≡ψ'(x)
         du[2]=2*m*(V(x)-ϵ)*u[1]/(ħ^2) # (ψ'(x))'=2m(V(x)-E)ψ(x)/ħ^2
     end
 
-    prob=ODEProblem(TISE!,IC,limits)
-    sol=solve(prob,Tsit5()) # using Tsit5() algorithm
+    IC1, IC2 = [1.,0.], [0.,1.] # Basis of initial conditions
+    prob1, prob2 = ODEProblem(TISE!,IC1,limits), ODEProblem(TISE!,IC2,limits)
+    sol1, sol2 = solve(prob1,Tsit5()), solve(prob2,Tsit5())
 
-    ABMatrix(t) = [func1(k,t) func2(k,t)
-                   funD1(k,t) funD2(k,t)]
-    AB(t)=ABMatrix(t)\sol(t)
-
-    xspan=LinRange(limits[1],limits[2],1000)
-
-    return (xspan = xspan,
-            wav = getindex.(sol.(xspan),1),
-            cf1 = AB(limits[1]),
-            cf2 = AB(limits[2])
-            )
+    return [sol1(limits[2]) sol2(limits[2])]
 end
 
-@unpack xspan, wav = coeffs([0,1.])
-plot(xspan,abs2.(wav))
+#=Finds ICs that produce desired (ψ,ψ') on RHS or LHS.
+Inputs: (ψ,ψ')', potential, energy, m, ħ, limits
+Output: ICs in (ψ,ψ') basis that produce desired (ψ,ψ')'
+=#
+function ICfinder(rvals,
+                  V,
+                  ϵ, m, ħ,
+                  limits
+                  )
+    k=sqrt(2*m*ϵ)/ħ
+    M = schrodinger_solver(V, ϵ, m, ħ, limits) #Matrix mapping IC to RHS
+    return M\rvals #linear comb of ICs that produce desired vals
+end
+
+#=Finds Transmission coefficient (not the norm sq. version)
+Inputs: Energy, direction ∈ {"L2R", "R2L"};
+basis functions (fn1(x) ->, fn2(x) <-), potential, energy, m, ħ, limits
+Output: [Transmission coefficient, Reflection coefficient]=#
+function transmission(ϵ, rlflag;
+                      fn1 = "plane wave",
+                      fn2 = "plane wave",
+                      fD1 = "plane wave",
+                      fD2 = "plane wave",
+                      V = asym_double_well,
+                      m = 1., ħ = 1.,
+                      limits = (-10.,15.)
+                      )
+    @assert rlflag in ["L2R", "R2L"] "Please choose LHS or RHS as a string"
+
+    k=sqrt(2*m*ϵ)/ħ
+
+    if fn1 == "plane wave"
+        func1(t) = exp(im*k*t) # defaults to exp(+i k x)
+    else
+        func1 = fn1
+    end
+    if fn2 == "plane wave"
+        func2(t) = exp(-im*k*t) # defaults to exp(-i k x)
+    else
+        func2 = fn2
+    end
+    if fD1 == "plane wave"
+        funD1(t) = im*k*exp(im*k*t) # defaults to +i k exp (+i k x)
+    else
+        funD1 = fD1
+    end
+    if fD2 == "plane wave"
+        funD2(t) = -im*k*exp(-im*k*t) # defaults to -i k exp (-i k x)
+    else
+        funD2 = fD2
+    end
+    func_M(A,B,x) = [A*func1(x) B*func2(x);
+                     A*funD1(x) B*funD2(x)]
+    func_V(A,B,x) = [A*func1(x)+B*func2(x),
+                     A*funD1(x)+B*funD2(x)]
+
+    if rlflag == "L2R" # B'=0 case
+        rAB = (1.,0.)
+        rvals = func_V(rAB[1],rAB[2],limits[2]) # ψ = 1*f₁ + 0*f₂ on RHS
+        lvals = ICfinder(rvals, V, ϵ, m, ħ, limits) # (ψ,ψ') on left
+        lAB = func_M(1,1,limits[1])\lvals # A,B giving left vals
+        T = rAB[1]/lAB[1] # transmission coefficient = A'/A
+        R = lAB[2]/lAB[1] # reflection coefficient = B/A
+    else # R2L transmission, A = 0 case
+        lAB = (0., 1.)
+        lvals = func_V(lAB[1],lAB[2],limits[1])
+        M = schrodinger_solver(V, ϵ, m, ħ, limits) #TISE matrix
+        rvals = M*lvals
+        rAB = func_M(1,1,limits[2])\rvals # A,B giving right vals
+        T = lAB[2]/rAB[2] # transmission coefficient = B/B'
+        R = rAB[1]/rAB[2] # reflection coefficient = A'/B'
+    end
+    return (T,R)
+end
