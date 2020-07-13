@@ -1,36 +1,14 @@
-#= This code is my first attempt at solving the TISE numerically, for the simple
-rectangular step potential V(x)={3,  1<x<2
-                                {0,  else
-Updated header 12-6-2020
+#=
+Improved version of the Step Potential Code.
+Solves for tranmission/reflection coefficients through an arbitrary potential
+in 1 dimension.
+
+Description last updated !3/07/20
 =#
-
 cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
-using DifferentialEquations
-using Plots
-
-tFine = LinRange(-10,15,1001) # spatial range
-
-function Vstep(x) # step potential
-    if 1<x<2
-        return 1 # V₀ = 1 so plot is over ϵ/V₀
-    else
-        return 0
-    end
-end
-function Vsink(x)
-    if 1<x<2
-        return -1 # V₀ = 1 so plot is over ϵ/V₀
-    else
-        return 0
-    end
-end
-function Vpara(x) # parabolic potential
-    if 1<x<2
-        return -4*(x-3/2)^2+1
-    else
-         return 0
-    end
-end
+using Plots, OrdinaryDiffEq, LinearAlgebra
+using UnPack
+using Revise
 
 #Asymmetric potential (after code by Danny)
 function asym_double_well(r; start=5, width=1, sep=1.2, h1=6, h2=10)::Float64
@@ -44,64 +22,105 @@ function asym_double_well(r; start=5, width=1, sep=1.2, h1=6, h2=10)::Float64
     return 0
 end
 
-function transmitted(en)
-    m = 1.0 # mass
-    ħ = 1.0 # reduced Planck's constant
-    ϵ = en # energy
-    k = sqrt(2*m*ϵ)/ħ # wavenumber
-
-    # Schroedinger equation
-    V(x)=DoubleWell(x)
-    function TISE!(du,u,p,x)
-        du[1] = u[2]  # ψ'(x)≡ψ'(x)
-        du[2] = 2*m*(V(x)-ϵ)*u[1]/(ħ^2)       # (ψ'(x))'=2m(V(x)-E)ψ(x)/ħ^2
+"""TISE solver, does the differential equations work
+Inputs: energy; potential, other constants, limits
+Output: matrix relating (ψ,ψ') on RHS to ICs"""
+function schrodinger_solver(V, #potential
+                            ϵ, #energy
+                            m, #mass
+                            ħ, #planck's constant
+                            limits #limits
+                            )
+    k=sqrt(2*m*ϵ)/ħ
+    function TISE!(du,u,p,x) # TISE gives (ψ,ψ')'=f((ψ,ψ'))
+        du[1]=u[2] # ψ'(x)≡ψ'(x)
+        du[2]=2*m*(V(x)-ϵ)*u[1]/(ħ^2) # (ψ'(x))'=2m(V(x)-E)ψ(x)/ħ^2
     end
 
-    # Initial conditions
-    ψ₀=exp(k*im) # Initial wavefunction; A=0, B=1
-    ψD₀=-k*im*exp(k*im) # Initial wavefunction gradient
-    u₀=[ψ₀, ψD₀] # Initial state vector
-    xspan = (-10.0,15.0) #Solve over range
+    IC1, IC2 = [1.,0.], [0.,1.] # Basis of initial conditions
+    prob1, prob2 = ODEProblem(TISE!,IC1,limits), ODEProblem(TISE!,IC2,limits)
+    sol1, sol2 = solve(prob1,Tsit5(),reltol=1e-8), solve(prob2,Tsit5(),reltol=1e-8)
 
-    prob=ODEProblem(TISE!,u₀,xspan)
-    sol=solve(prob)
-
-    # Solve right and left wave
-    ABMatrix(t) = [exp(im*k*t)      exp(-im*k*t);
-                   im*k*exp(im*k*t) -im*k*exp(-im*k*t)]
-    AB(t)=ABMatrix(t)\sol(t)
-    ABs=AB.(tFine)
-    As=[i[1] for i in ABs]
-    Bs=[i[2] for i in ABs]
-
-    # Wavefunction plot
-    #plot(plot(tFine, abs2.(getindex.(sol.(tFine),1))), plot(sol.t, V.(sol.t)), layout=(2,1))
-    # Transmission coefficients plot
-    #plot(plot(tFine, abs2.(As)), plot(tFine, abs2.(Bs)), layout=(2,1))
-    #plot(tFine, [abs2.(As) abs2.(Bs)])
-
-    T=abs2(Bs[1])/abs2(Bs[end])
-    R=abs2(As[end])/abs2(Bs[end])
-
-    return T # return transmission coefficient
+    return [sol1(limits[2]) sol2(limits[2])]
 end
 
-ϵRange = LinRange(0.01,20,1000)
-Ts = transmitted.(ϵRange)
-plot(ϵRange,Ts,
-     xlabel="Energy", ylabel="Transmission",
-     legend=false,
-     width=2,
-     color=:royalblue)
-#savefig("Double_Barrier_Transmission.svg")
+"""Finds ICs that produce desired (ψ,ψ') on RHS or LHS.
+Inputs: (ψ,ψ')', potential, energy, m, ħ, limits
+Output: ICs in (ψ,ψ') basis that produce desired (ψ,ψ')'
+"""
+function ICfinder(rvals,
+                  V,
+                  ϵ, m, ħ,
+                  limits
+                  )
+    k=sqrt(2*m*ϵ)/ħ
+    M = schrodinger_solver(V, ϵ, m, ħ, limits) #Matrix mapping IC to RHS
+    return M\rvals #linear comb of ICs that produce desired vals
+end
 
-plot(LinRange(2.5,10,100),DoubleWell.(LinRange(2.5,10,100)),
-     xlabel="x",
-     ylabel="V(x)",
-     width=2,
-     legend=false,
-     color=:royalblue)
-#savefig("Double_Barrier_Potential.svg")
-#plot(tFine, Vstep.(tFine))
-#plot!(tFine, Vsink.(tFine))
-#plot!(tFine, Vpara.(tFine))
+"""Finds Transmission coefficient (not the norm sq. version)
+Inputs: Energy, direction ∈ {"L2R", "R2L"};
+basis functions (fn1(x) ->, fn2(x) <-), potential, energy, m, ħ, limits
+Output: [Transmission coefficient, Reflection coefficient]"""
+function transmission(ϵ, rlflag;
+                      fn1 = "plane wave",
+                      fn2 = "plane wave",
+                      fD1 = "plane wave",
+                      fD2 = "plane wave",
+                      V = asym_double_well,
+                      m = 1., ħ = 1.,
+                      limits = (-10.,15.)
+                      )
+    @assert rlflag in ["L2R", "R2L"] "Please choose LHS or RHS as a string"
+
+    k=sqrt(2*m*ϵ)/ħ
+
+    if fn1 == "plane wave"
+        func1(t) = exp(im*k*t) # defaults to exp(+i k x)
+    else
+        func1 = fn1
+    end
+    if fn2 == "plane wave"
+        func2(t) = exp(-im*k*t) # defaults to exp(-i k x)
+    else
+        func2 = fn2
+    end
+    if fD1 == "plane wave"
+        funD1(t) = im*k*exp(im*k*t) # defaults to +i k exp (+i k x)
+    else
+        funD1 = fD1
+    end
+    if fD2 == "plane wave"
+        funD2(t) = -im*k*exp(-im*k*t) # defaults to -i k exp (-i k x)
+    else
+        funD2 = fD2
+    end
+    func_M(A,B,x) = [A*func1(x) B*func2(x);
+                     A*funD1(x) B*funD2(x)]
+    func_V(A,B,x) = [A*func1(x)+B*func2(x),
+                     A*funD1(x)+B*funD2(x)]
+
+    if rlflag == "L2R" # B'=0 case
+        rAB = (1.,0.)
+        rvals = func_V(rAB[1],rAB[2],limits[2]) # ψ = 1*f₁ + 0*f₂ on RHS
+        lvals = ICfinder(rvals, V, ϵ, m, ħ, limits) # (ψ,ψ') on left
+        lAB = func_M(1,1,limits[1])\lvals # A,B giving left vals
+        T = rAB[1]/lAB[1] # transmission coefficient = A'/A
+        R = lAB[2]/lAB[1] # reflection coefficient = B/A
+    else # R2L transmission, A = 0 case
+        lAB = (0., 1.)
+        lvals = func_V(lAB[1],lAB[2],limits[1])
+        M = schrodinger_solver(V, ϵ, m, ħ, limits) #TISE matrix
+        rvals = M*lvals
+        rAB = func_M(1,1,limits[2])\rvals # A,B giving right vals
+        T = lAB[2]/rAB[2] # transmission coefficient = B/B'
+        R = rAB[1]/rAB[2] # reflection coefficient = A'/B'
+    end
+    return T,R
+end
+
+ϵrange = LinRange(1,50,100)
+Ts = [i[1] for i in transmission.(ϵrange, "L2R")]
+Rs = [i[2] for i in transmission.(ϵrange, "R2L")]
+plot(ϵrange, abs2.(Ts), ylims=(0,2))
+plot!(ϵrange, abs2.(Rs), ylims=(0,2))
