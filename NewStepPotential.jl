@@ -120,5 +120,11 @@ function transmission(ϵ, rlflag;
         T = lAB[2]/rAB[2] # transmission coefficient = B/B'
         R = rAB[1]/rAB[2] # reflection coefficient = A'/B'
     end
-    return (T,R)
+    return T,R
 end
+
+ϵrange = LinRange(1,50,100)
+Ts = [i[1] for i in transmission.(ϵrange, "L2R")]
+Rs = [i[2] for i in transmission.(ϵrange, "L2R")]
+plot(ϵrange, abs2.(Ts))
+plot!(ϵrange, abs2.(Rs))
