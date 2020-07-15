@@ -1,8 +1,10 @@
 #=
-Setting up Przybytek potential and getting to grips with Unitful
+Przybytek potential for the ⁵Σ⁺g He₂.
 
-Description last updated 13/07/20
+Description last updated 14/07/20
 =#
+module Przybytek
+
 using Unitful, UnitfulAtomic
 using Plots
 using Revise
@@ -56,13 +58,16 @@ function przybytek(R)
     return V
 end
 
-Rgrid = LinRange(6.8,8.2,10001)u"bohr"
+#=
+#Test: produces plots to compare with przybytek paper
+Rgrid = LinRange(5,26,10001)u"bohr"
 Vgrid = przybytek.(Rgrid) # Eₕ
 νgrid = hartree2wavenumber.(Vgrid) # cm⁻¹
 
 plot(ustrip.(Rgrid), ustrip.(νgrid),
      xlabel="R (a₀)", ylabel="V(R) (cm⁻¹)",
-     legend=false,
-     yticks=(-940):-20:(-1040),
-     xticks=6.8:0.2:8.2
+     legend=false
      )
+=#
+
+end # module

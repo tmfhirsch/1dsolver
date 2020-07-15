@@ -3,11 +3,11 @@ Improved version of the Step Potential Code.
 Solves for tranmission/reflection coefficients through an arbitrary potential
 in 1 dimension.
 
-Description last updated !3/07/20
+Description last updated 13/07/20
 =#
-cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
-using Plots, OrdinaryDiffEq, LinearAlgebra
-using UnPack
+module StepPotential
+
+using OrdinaryDiffEq, LinearAlgebra
 using Revise
 
 #Asymmetric potential (after code by Danny)
@@ -31,7 +31,6 @@ function schrodinger_solver(V, #potential
                             ħ, #planck's constant
                             limits #limits
                             )
-    k=sqrt(2*m*ϵ)/ħ
     function TISE!(du,u,p,x) # TISE gives (ψ,ψ')'=f((ψ,ψ'))
         du[1]=u[2] # ψ'(x)≡ψ'(x)
         du[2]=2*m*(V(x)-ϵ)*u[1]/(ħ^2) # (ψ'(x))'=2m(V(x)-E)ψ(x)/ħ^2
@@ -119,8 +118,4 @@ function transmission(ϵ, rlflag;
     return T,R
 end
 
-ϵrange = LinRange(1,50,100)
-Ts = [i[1] for i in transmission.(ϵrange, "L2R")]
-Rs = [i[2] for i in transmission.(ϵrange, "R2L")]
-plot(ϵrange, abs2.(Ts), ylims=(0,2))
-plot!(ϵrange, abs2.(Rs), ylims=(0,2))
+end #module
