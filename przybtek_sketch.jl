@@ -5,10 +5,9 @@ Description last updated 14/07/20=#
 
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
 
-using OrdinaryDiffEq, Plots, ComponentArrays, LinearAlgebra
-using StepPotential: schrodinger_solver
-using Przybytek: przybytek, Unitful, UnitfulAtomic
 using Revise
+using OrdinaryDiffEq, Plots, ComponentArrays, LinearAlgebra, Unitful, UnitfulAtomic
+using Przybytek: przybytek
 
 
 """TISE solver for IC of (ψ,ψ')=(0,1)
@@ -32,6 +31,8 @@ function rhs_solver(ϵ;
     sol=solve(prob,Tsit5())
     return sol
 end
+
+#=
 sol=rhs_solver(10u"hartree",stapt=1.0u"bohr",endpt=150.0u"bohr")
 Rs=sol.t
 ψs=[i[1] for i in sol.u[:]]
@@ -39,6 +40,7 @@ Rs=sol.t
 Vs=przybytek.(Rs)
 Vplot=plot(ustrip.(Rs), ustrip.(Vs), legend=false)
 plot(ψplot, Vplot, layout=(2,1))
+=#
 #=
 # Test of above
 ϵ=1u"hartree"

@@ -8,7 +8,7 @@ Description last updated 13/07/20
 module StepPotential
 
 using OrdinaryDiffEq, LinearAlgebra
-using Revise
+
 
 #Asymmetric potential (after code by Danny)
 function asym_double_well(r; start=5, width=1, sep=1.2, h1=6, h2=10)::Float64

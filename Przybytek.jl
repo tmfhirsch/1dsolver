@@ -7,7 +7,6 @@ module Przybytek
 
 using Unitful, UnitfulAtomic
 using Plots
-using Revise
 
 """
 Damping function of Tang and Toennies [31 in Przybytek]
