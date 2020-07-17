@@ -80,7 +80,7 @@ function tan_shift(l::Int, #ang mom
         sol=rhs_solver(ϵ,stapt=stapt,endpt=endpt,U=V,μ=μ) # [u,u'](R)
         M(R)=[sin(k*R)      cos(k*R); # sin(kR), cos(kR) & derivs
               k*cos(k*R)    -k*sin(k*R)]
-    elseif l>0
+    else
         V(R)=auconvert(U(R)+l*(l+1)u"ħ^2"/(2*μ*R^2)) # add centrifugal potential
         sol=rhs_solver(ϵ,stapt=stapt,endpt=endpt,U=V,μ=μ) # [u,u'](R)
         M(R) = [j(l,k*R)                        n(l,k*R);
