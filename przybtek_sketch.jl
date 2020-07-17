@@ -83,8 +83,11 @@ function tan_shift(l::Int, #ang mom
     else
         V(R)=auconvert(U(R)+l*(l+1)u"ħ^2"/(2*μ*R^2)) # add centrifugal potential
         sol=rhs_solver(ϵ,stapt=stapt,endpt=endpt,U=V,μ=μ) # [u,u'](R)
-        M(R) = [j(l,k*R)                        n(l,k*R);
-                (l/R)*j(l,k*R)-k*j(l+1,k*R)     (l/R)*n(l,k*R)-k*n(l+1,k*R)]
+        f(x)=[j(l,k*x)                        n(l,k*x);
+              (l/x)*j(l,k*x)-k*j(l+1,k*x)     (l/x)*n(l,k*x)-k*n(l+1,k*x)]
+        M=f # BUG: this works, but directly defining M(x) as in l86 does not!?
+        #M(R)=[j(l,k*R)                        n(l,k*R);
+        #      (l/R)*j(l,k*R)-k*j(l+1,k*R)     (l/R)*n(l,k*R)-k*n(l+1,k*R)]
     end
     AB = ustrip.(M(endpt))\ustrip.(sol(endpt)) # matching, stripping to do maths
     return AB[2]/AB[1] # tan(δₗ)=Bₗ/Aₗ
