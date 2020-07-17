@@ -78,14 +78,13 @@ function tan_shift(l::Int, #ang mom
     if l==0 #𝑠-wave case
         V=U #V₀(R) simply equals BO potential
         sol=rhs_solver(ϵ,stapt=stapt,endpt=endpt,U=V,μ=μ) # [u,u'](R)
-        M(R)=[sin(k*R)      cos(k*R); # sin(kR), cos(kR) & derivs
-              k*cos(k*R)    -k*sin(k*R)]
+        M = R-> [sin(k*R)      cos(k*R); # sin(kR), cos(kR) & derivs
+                 k*cos(k*R)    -k*sin(k*R)]
     else
         V(R)=auconvert(U(R)+l*(l+1)u"ħ^2"/(2*μ*R^2)) # add centrifugal potential
         sol=rhs_solver(ϵ,stapt=stapt,endpt=endpt,U=V,μ=μ) # [u,u'](R)
-        f(x)=[j(l,k*x)                        n(l,k*x);
-              (l/x)*j(l,k*x)-k*j(l+1,k*x)     (l/x)*n(l,k*x)-k*n(l+1,k*x)]
-        M=f # BUG: this works, but directly defining M(x) as in l86 does not!?
+        M = R -> [j(l,k*R)                        n(l,k*R);
+                  (l/R)*j(l,k*R)-k*j(l+1,k*R)     (l/R)*n(l,k*R)-k*n(l+1,k*R)]
         #M(R)=[j(l,k*R)                        n(l,k*R);
         #      (l/R)*j(l,k*R)-k*j(l+1,k*R)     (l/R)*n(l,k*R)-k*n(l+1,k*R)]
     end
