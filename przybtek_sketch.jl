@@ -62,8 +62,8 @@ plot(ustrip.(Rs), ustrip.(us), legend=false, title="$plot_ϵ")
 """
 Spherical bessel functions
 """
-j(l,x)=sqrt(pi/(2*x))*besselj(l+1/2, x) # spherical bessel function jₗ(x)
-n(l,x)=sqrt(pi/(2*x))*bessely(l+1/2, x) # spherical bessel function nₗ(x)
+j(l,x)=sphericalbesselj(l,x)
+n(l,x)=sphericalbessely(l,x)
 
 """
 Tries to find large-R limit of Aₗ, Bₗ, matching to jₗ(kR) and nₗ(kR)
@@ -114,9 +114,10 @@ end
 
 
 lhs=1.0u"bohr"
-rhs=500.0u"bohr"
+rhs=500000.0u"bohr"
 k=1e-6u"bohr^-1"
-l=0
+l=1
+zero_pot(R)=0.0u"hartree"
 wavefn=rhs_solver(k,l,stapt=lhs,endpt=rhs)
 ABfn=AB_limit(wavefn,k,l,lhs,rhs)
 Rs=LinRange(lhs,rhs,1000)
@@ -125,4 +126,5 @@ As=getindex.(ABs,1)
 Bs=getindex.(ABs,2)
 Aplt=plot(austrip.(Rs),As,label="A")
 Bplt=plot(austrip.(Rs),Bs,label="B")
-plot(Aplt,Bplt,layout=(2,1),title="l=$l, k=$k")
+#plot(Aplt,Bplt,layout=(2,1),title="l=$l, k=$k")
+plot(austrip.(Rs),Bs./As,xlabel="R (a₀)",ylabel="B(R)/A(R)",title="l=$l,k=$k",legend=false)
