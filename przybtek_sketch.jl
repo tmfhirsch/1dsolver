@@ -14,7 +14,7 @@ using Przybytek: przybytek
 """
 TISE solver for IC of (u,u')=(0,1)
 All inputs in units, or assumed to be in atomic units if not.
-Inputs: energy, limits; V(R)=przybytek, m=He₂ mass
+Inputs: k, l; lhs~[L], rhs~[R], U(R)=przybytek, μ=He₂ mass, reltol for DE solver
 Output: (u,u')~(1,a₀⁻¹) as fn of R~a₀"""
 function rhs_solver(k, # wavenumber [L]⁻¹
                     l::Int; # angular momentum
@@ -111,14 +111,13 @@ plot(austrip.(Rs),Bs./As,xlabel="R (a₀)",ylabel="B(R)/A(R)",title="l=$l,k=$k",
 #plot(austrip.(Rs),austrip.(getindex.(wavefn.(Rs),1)))
 =#
 
-
 """
 Finds convergence of B(R)/A(R)
-Input: AB(R) function; no. grid pts, median bubble, convergence tolerance,
+Input: AB(R) ~ [L]->1; no. grid pts, median bubble, convergence tolerance,
 warning 10^index, break10^index
 Output: tan(δ₀) within tolerance, or an error if 10^break reached
 """
-function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e-8, warn=6::Int, stop=8::Int)
+function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e-8, warn=6::Int, stop=10::Int)
     BoA(R) = AB(R)[2]/AB(R)[1] #B/A -> tanδₗ
     i=1 # Index for R∈(10ⁱ,10ⁱ⁺¹)
     while true
@@ -140,12 +139,61 @@ function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e-8, warn=6::Int, stop=8::I
     end
 end
 
+#=
 # Investigating B(R)/A(R)
 lhs=1.0u"bohr"
 rhs=1e8u"bohr"
 k=1e-5u"bohr^-1"
-l=2
+l=5
 wavefn=rhs_solver(k,l,stapt=lhs,endpt=rhs,reltol=1e-10)
 ABfn=matchAB(wavefn,k,l)
 str="l=$l, tan(δₗ) = "*string(BoA_lim(ABfn))
 @info str
+=#
+
+"""
+Finds scattering length of a given potential
+Input: Potential ~ [L]->[E]; lhs~[L], rhs~[R], μ~[M], convergence tolerance
+warning index, max index
+Output: a in nanometres, or an error if max index reached
+"""
+function scatlen(pot;# potential
+                 lhs=1u"bohr", # start point for solving DE
+                 rhs=1e8u"bohr", # end pt for solving DE
+                 μ=0.5*4.002602u"u", # reduced mass
+                 strt=5.0, # start i for k=10^-i
+                 warn=10::Int,
+                 stop=15::Int,
+                 tol=1e-2u"nm" #tolerance in nm on the scattering length
+                 )
+    i=strt
+    while true
+        # wavenumbers to test for convergence
+        k1 = 10^(-i)*1u"bohr^-1"
+        k2 = 10^(-i-1)*1u"bohr^-1"
+        k3 = 10^(-i-2)*1u"bohr^-1"
+        sol1 = rhs_solver(k1, 0, stapt=lhs, endpt=rhs)
+        sol2 = rhs_solver(k2, 0, stapt=lhs, endpt=rhs)
+        sol3 = rhs_solver(k3, 0, stapt=lhs, endpt=rhs)
+        AB1 = matchAB(sol1, k1, 0) # scattering length: l=0
+        AB2 = matchAB(sol2, k2, 0)
+        AB3 = matchAB(sol3, k3, 0)
+        tanδ1 = BoA_lim(AB1)
+        tanδ2 = BoA_lim(AB2)
+        tanδ3 = BoA_lim(AB3)
+        ai = uconvert.(u"nm", -[tanδ1/k1, tanδ2/k2, tanδ3/k3]) #scat lgths (nm)
+        if std(ai) < tol # standard devation of scat lengths within tolerance
+            return ai[end] # taking last one/smallest k value
+            break
+        end
+        if i == warn
+            @warn "tan(δ(k))/k hasn't converged by k=$k1"
+        elseif i == stop
+            @error "tan(δ(k))/k didn't converge by k=$k1"
+        end
+        i += 1
+    end
+end
+
+# Testing scatlen
+@info scatlen(przybytek)
