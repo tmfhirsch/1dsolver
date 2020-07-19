@@ -144,13 +144,8 @@ end
 lhs=1.0u"bohr"
 rhs=1e8u"bohr"
 k=1e-5u"bohr^-1"
-l=0
+l=2
 wavefn=rhs_solver(k,l,stapt=lhs,endpt=rhs,reltol=1e-10)
 ABfn=matchAB(wavefn,k,l)
-#BoA_lim(ABfn)
-
-function testwhile()
-    i=1
-    while true
-        i+=1
-        if
+str="l=$l, tan(δₗ) = "*string(BoA_lim(ABfn))
+@info str
