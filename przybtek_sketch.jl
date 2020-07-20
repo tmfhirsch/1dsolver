@@ -43,13 +43,14 @@ function rhs_solver(k, # wavenumber [L]⁻¹
     end
     IC = SVector{2}([0.0, 1.0]) # (u,u')=(0,1)
     prob=ODEProblem(TISE,IC,(stapt⁰,endpt⁰))
+    # Add units back
     sol_unitless=solve(prob,Tsit5(),reltol=1e-10) # comes out of DE sans units
     sol_input = x -> sol_unitless(austrip(x)) # add unit input
     sol = x -> sol_input(x).*SA[1,1u"bohr^-1"] # add unit output
     return sol
 end
-#=
-#Test plot of rhs_solver
+
+#= #Testing rhs_solver
 plot_k=1e-5u"bohr^-1"
 plot_stapt=1.0u"bohr"
 plot_endpt=20000.0u"bohr"
@@ -57,8 +58,7 @@ sol=rhs_solver(plot_k,stapt=plot_stapt,endpt=plot_endpt)
 Rs=LinRange(plot_stapt,plot_endpt,1000)
 us=[i[1] for i in sol.(Rs)]
 plot(ustrip.(Rs), ustrip.(us), legend=false, title="$plot_ϵ")
-#savefig("prz_wfn_ϵ-$plot_ϵ.png")
-=#
+#savefig("prz_wfn_ϵ-$plot_ϵ.png") =#
 
 """
 Spherical bessel functions
@@ -80,7 +80,7 @@ function matchAB(sol, #(u,u')(R) ~ [L]->(1,[L]⁻¹)
     if l==0 #𝑠-wave
         M = R -> [sin(k*R)   cos(k*R); # sin(kR), cos(kR) & derivs
                   k*cos(k*R) -k*sin(k*R)]
-    else
+    else #TODO send l=0 to bessel fns too, see if i get same (check 1/R needed)
         M = R -> [j(l,k*R)                    n(l,k*R); #jₗ(kR), nₗ(kR) & derivs
                   (l/R)*j(l,k*R)-k*j(l+1,k*R) (l/R)*n(l,k*R)-k*n(l+1,k*R)]
     end
@@ -88,8 +88,7 @@ function matchAB(sol, #(u,u')(R) ~ [L]->(1,[L]⁻¹)
     return AB
 end
 
-#=
-# Investigating B(R)/A(R)
+#= # Testing matchAB
 lhs=1.0u"bohr"
 rhs=1e8u"bohr"
 k=1e-5u"bohr^-1"
@@ -108,14 +107,13 @@ Bplt=plot(austrip.(Rs),Bs,label="B")
 plot(austrip.(Rs),Bs./As,xlabel="R (a₀)",ylabel="B(R)/A(R)",title="l=$l,k=$k",legend=false)
 #tan_δ₀ = mean((Bs./As)[Int(floor(no_pts/2)):end])
 #σ=std((Bs./As)[Int(floor(no_pts/2)):end])
-#plot(austrip.(Rs),austrip.(getindex.(wavefn.(Rs),1)))
-=#
+#plot(austrip.(Rs),austrip.(getindex.(wavefn.(Rs),1))) =#
 
 """
-Finds convergence of B(R)/A(R)
+Finds convergence of B(R)/A(R)=tan(δ)
 Input: AB(R) ~ [L]->1; no. grid pts, median bubble, convergence tolerance,
 warning 10^index, break10^index
-Output: tan(δ₀) within tolerance, or an error if 10^break reached
+Output: lim(r→∞) B(R)/A(R) within tolerance, or an error if 10^stop reached
 """
 function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e-8, warn=6::Int, stop=10::Int)
     BoA(R) = AB(R)[2]/AB(R)[1] #B/A -> tanδₗ
@@ -133,31 +131,29 @@ function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e-8, warn=6::Int, stop=10::
         if i == warn
             @warn "B(R)/A(R) hasn't converged by 10^$warn a₀"
         elseif i == stop
-            @error "B(R)/A(R) did not converge by 10^$break a₀"
+            @error "B(R)/A(R) did not converge by 10^$stop a₀"
         end
         i += 1
     end
 end
 
-#=
-# Investigating B(R)/A(R)
+#= # Testing BoA_lim
 lhs=1.0u"bohr"
 rhs=1e8u"bohr"
 k=1e-5u"bohr^-1"
-l=5
+l=0
 wavefn=rhs_solver(k,l,stapt=lhs,endpt=rhs,reltol=1e-10)
 ABfn=matchAB(wavefn,k,l)
 str="l=$l, tan(δₗ) = "*string(BoA_lim(ABfn))
-@info str
-=#
+@info str=#
 
 """
 Finds scattering length of a given potential
-Input: Potential ~ [L]->[E]; lhs~[L], rhs~[R], μ~[M], convergence tolerance
+Input: Potential ~ [L]->[E]; lhs~[L], rhs~[R], μ~[M], convergence tolerance,
 warning index, max index
 Output: a in nanometres, or an error if max index reached
 """
-function scatlen(pot;# potential
+function scatlen(pot; # potential
                  lhs=1u"bohr", # start point for solving DE
                  rhs=1e8u"bohr", # end pt for solving DE
                  μ=0.5*4.002602u"u", # reduced mass
@@ -172,9 +168,9 @@ function scatlen(pot;# potential
         k1 = 10^(-i)*1u"bohr^-1"
         k2 = 10^(-i-1)*1u"bohr^-1"
         k3 = 10^(-i-2)*1u"bohr^-1"
-        sol1 = rhs_solver(k1, 0, stapt=lhs, endpt=rhs)
-        sol2 = rhs_solver(k2, 0, stapt=lhs, endpt=rhs)
-        sol3 = rhs_solver(k3, 0, stapt=lhs, endpt=rhs)
+        sol1 = rhs_solver(k1, 0, U=pot, stapt=lhs, endpt=rhs)
+        sol2 = rhs_solver(k2, 0, U=pot, stapt=lhs, endpt=rhs)
+        sol3 = rhs_solver(k3, 0, U=pot, stapt=lhs, endpt=rhs)
         AB1 = matchAB(sol1, k1, 0) # scattering length: l=0
         AB2 = matchAB(sol2, k2, 0)
         AB3 = matchAB(sol3, k3, 0)
@@ -183,6 +179,7 @@ function scatlen(pot;# potential
         tanδ3 = BoA_lim(AB3)
         ai = uconvert.(u"nm", -[tanδ1/k1, tanδ2/k2, tanδ3/k3]) #scat lgths (nm)
         if std(ai) < tol # standard devation of scat lengths within tolerance
+            #TODO replace std with max and min, sample size is too small
             return ai[end] # taking last one/smallest k value
             break
         end
@@ -195,5 +192,43 @@ function scatlen(pot;# potential
     end
 end
 
-# Testing scatlen
-@info scatlen(przybytek)
+#= # Testing scatlen
+@info scatlen(przybytek)=#
+
+
+"""
+Finds partial cross section σₗ
+Input: k~[L]⁻¹, l; potential~[L]->[E], lhs~[L], rhs~[R], μ~[M]
+Outputs: σₗ~[L]^2 (cm^2 by default)
+"""
+function partialσ(k,
+                  l::Int;
+                  pot=przybytek,
+                  lhs=1.0u"bohr", #lhs for DE solver
+                  rhs=1e8u"bohr", #rhs for DE solver
+                  μ=0.5*4.002602u"u" # reduced mass
+                  )
+    sol = rhs_solver(k,l,U=pot,stapt=lhs,endpt=rhs, μ=μ)
+    AB = matchAB(sol,k,l) # (A,B)(R)
+    BoA = BoA_lim(AB) # lim(R→∞) B(R)/A(R) ≈ tan(δ₀)
+    δₗ = atan(BoA) # partial phase shift
+    σₗ = 4*pi*(2*l+1)*sin(δₗ)^2/k^2 # partial cross section
+    return uconvert(u"cm^2", σₗ)
+end
+
+# Testing partialσ on BO pot. k↓,σ0→σa. l↑,σl↓. k↑,σl↑ as desired.
+#=a = scatlen(przybytek)
+σa = 4*pi*a^2
+k=1e-3u"bohr^-1"
+σ0=partialσ(k,3)
+@info uconvert.(u"cm^2", (σa,σ0))=#
+
+# Testing on hard sphere potential. Scattering length → radius as desired
+#=hardradius = 1u"bohr" #TODO easier to do hard sphere with initial condition u=0 and lhs = radius of sphere. Better for cf to analytic results to very high precision
+hardsphere(R) = R > hardradius ? 0u"hartree" : 1e3u"hartree"
+a = scatlen(hardsphere,lhs=0.99u"bohr")
+k=1e-5u"bohr^-1"
+l=0
+σ0=partialσ(k,l,pot=hardsphere,lhs=0.99u"bohr")
+@info uconvert(u"bohr", a)
+@info uconvert(u"bohr^2", σ0), 4π=#
