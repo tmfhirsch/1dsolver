@@ -11,21 +11,12 @@ using Plots
 """
 Damping function of Tang and Toennies [31 in Przybytek]
     Input: n::Int index of gₙ (note diff. to g₂ₙ in paper); x
-    Output: gₙ(x)
+    Output: gₙ(x) (Eₕ)
 """
 function damping(n::Int, x)
     taylor = sum([x^i/(factorial(i)) for i=0:n])
     return (1-exp(-x)*taylor)u"hartree"
 end
-
-
-"""
-Converts hartrees to cm⁻¹
-    Input: E in Eh
-    Output: Corresponding ν in cm⁻¹ where E=hcν
-"""
-hartree2wavenumber(E)=uconvert(u"cm^-1", E/u"h*c")
-
 
 """
 Przybytek analytic expression for the ⁵Σ⁺g He₂ potential, in atomic units
@@ -56,6 +47,14 @@ function przybytek(R)
         -damping(11,η*R)*C₁₁/R^11)
     return V
 end
+
+
+"""
+Converts hartrees to cm⁻¹
+    Input: E in Eh
+    Output: Corresponding ν in cm⁻¹ where E=hcν
+"""
+hartree2wavenumber(E)=uconvert(u"cm^-1", E/u"h*c")
 
 #=
 #Test: produces plots to compare with przybytek paper
