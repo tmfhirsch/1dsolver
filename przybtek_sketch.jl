@@ -22,7 +22,8 @@ function rhs_solver(k, # wavenumber [L]⁻¹
                     endpt=100.0u"bohr", # RHS to be solved to [L]
                     pot=przybytek, # interatomic potential [L]->[E]
                     μ=0.5*4.002602u"u", # He₂ reduced mass [M]
-                    reltol=1e-10 #relative tolerance for DE solver
+                    reltol=1e-10, #relative tolerance for DE solver
+                    maxiters=1e6 #max iterations for DE solver
                     )
     ϵ=auconvert(k^2*1u"ħ^2"/(2*μ)) # E=ħ²k²/2μ
     # add centrifugal potential
@@ -44,7 +45,7 @@ function rhs_solver(k, # wavenumber [L]⁻¹
     IC = SVector{2}([0.0, 1.0]) # (u,u')=(0,1)
     prob=ODEProblem(TISE,IC,(stapt⁰,endpt⁰))
     # Add units back
-    sol_unitless=solve(prob,Tsit5(),reltol=reltol) # comes out of DE sans units
+    sol_unitless=solve(prob,Tsit5(),reltol=reltol,maxiters=maxiters) # comes out of DE sans units
     sol_input = x -> sol_unitless(austrip(x)) # add unit input
     sol = x -> sol_input(x).*SA[1u"bohr",1] # add unit output
     return sol
@@ -90,7 +91,8 @@ function matchAB(sol, #(u,u')(R) ~ [L]->(1,[L]⁻¹)
     return AB
 end
 
-# Testing A,B matching hard sphere analytic solution
+# Testing that A, B match the analytic soln for hard sphere scattering
+# 24/07/20 agreement shown, see Slack message to danny from this date
 function AB_analytic_check(rad=1.0u"bohr", evalpt=100.0u"bohr", l=1::Int)
     Avals, Bvals = [], [] # store for AB(evalpt)
     Asols, Bsols = [], [] # store for analytic soln for AB(endpt)
@@ -164,7 +166,6 @@ function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e0, warn=50::Int, stop=100:
         i += 1
     end
 end
-
 
 # Testing BoA_lim
 #=lhs=0.615124u"bohr"
@@ -247,31 +248,28 @@ function partialσ(k,
     return uconvert(u"cm^2", σₗ)
 end
 
-# Testing partialσ on BO pot. k↓,σ0→σa. l↑,σl↓. k↑,σl↑ as desired.
-#=a = scatlen(przybytek)
-σa = 4*pi*a^2
-k=1e-3u"bohr^-1"
-σ0=partialσ(k,3)
-@info uconvert.(u"cm^2", (σa,σ0))=#
-
-# Testing on hard sphere potential. Scattering length → radius as desired
-#sphere. Better for cf to analytic results to very high precision.
-#=hardradius = 1u"bohr"
-V_hardsphere(R)=hardsphere(R,rad=hardradius)
-a = scatlen(V_hardsphere,lhs=hardradius)
-k=1e-5u"bohr^-1"
-function σsum()
-    σ=0u"cm^2"
-    for l=0:20 # sum over first 10 partial waves
-        σ += partialσ(k,l,pot=hardsphere,lhs=hardradius,rhs=100*2*pi/k)
+"""Testing hard sphere partial cross section vs energy"""
+function σ_energy_check(rad=1.0u"bohr")
+    ls=[0,1,2,3,4]
+    kRange = LinRange(1e1,1e-12,50)u"bohr^-1"
+    pot = R -> hardsphere(R, rad=rad)
+    σls = []
+    labs= []
+    for l in ls
+        push!(labs, "l=$l")
+        σs = Float64[]
+        for k in kRange
+            push!(σs, ustrip.(partialσ(k,l,pot=pot,lhs=rad)))
+        end
+        push!(σls,σs)
     end
-    return σ
+    σls=reshape(hcat(σls...), (length(kRange),length(ls)))
+    labs=reshape(convert(Array{String,1},labs), 1, length(labs))
+    σt=zeros(length(kRange),1)
+    for i in 1:length(kRange)
+        σt[i]=sum(σls[i,:])
+    end
+    labs=hcat(labs, ["total"])
+    return plot(austrip.(kRange), hcat(σls,σt), xlabel="k (a₀⁻¹)", ylabel="σₗ (cm²)",
+    title="Hard sphere; partial cross sections vs. wavenumber",labels=labs)
 end
-@info "k=$k", uconvert(u"bohr", a)
-@info "k=$k", uconvert(u"bohr^2", σsum()), 2π, 4π=#
-
-# Current error: arguments to the spherical bessel fns are getting too large
-# I suspect it is because the BoA_lim function was searching for R too large.
-# The reason for this is that the BoA tolerance is never achieved for large
-# (i.e. 10^{>0}) k. I don't think this is an issue for low temperatures, but it
-# does highlight the phenomenological reason for existence of the BoA tolerance.
