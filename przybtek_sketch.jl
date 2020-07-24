@@ -70,6 +70,8 @@ n(l,x)=sphericalbessely(l,x)
 """Zero potential, for testing functions"""
 zero_pot(R)=0.0u"hartree"
 
+"""Hard sphere potential, for testing functions"""
+hardsphere(R,rad=1u"bohr") = R > rad ? 0u"hartree" : 1e3u"hartree"
 
 """
 Returns (Aₗ,Bₗ)(R) that match wavefunction to spherical bessel functions
@@ -88,11 +90,35 @@ function matchAB(sol, #(u,u')(R) ~ [L]->(1,[L]⁻¹)
     return AB
 end
 
-#= # Testing matchAB
-lhs=1.0u"bohr"
+# Testing A,B matching hard sphere analytic solution
+function AB_analytic_check(rad=1.0u"bohr", evalpt=100.0u"bohr", l=1::Int)
+    Avals, Bvals = [], [] # store for AB(evalpt)
+    Asols, Bsols = [], [] # store for analytic soln for AB(endpt)
+    kRange=LinRange(1e-5,1e-7,20)u"bohr^-1"
+    for k in kRange
+        sol=rhs_solver(k, l, stapt=rad, endpt=evalpt)
+        AB = matchAB(sol, k, l)
+        ABeval = AB(evalpt)
+        append!(Avals, ABeval[1]) # store A evaluation
+        append!(Bvals, ABeval[2]) # store B evaluation
+        analA = -rad^2*k*n(l,rad*k) # analytic A soln ~ [L]
+        analB = +rad^2*k*j(l,rad*k) # analytic B soln ~ [L]
+        append!(Asols, analA) # store A analytic solution
+        append!(Bsols, analB) # store B analytic solution
+    end
+
+    Aplt = plot(austrip.(kRange), Avals, labels=["calculated"]); plot!(austrip.(kRange), austrip.(Asols),
+    xlabel="k (a₀⁻¹)", ylabel="A (a₀)", labels=["analytic"])
+    Bplt = plot(austrip.(kRange), Bvals, labels=["calculated"]); plot!(austrip.(kRange), austrip.(Bsols),
+    xlabel="k (a₀⁻¹)", ylabel="B (a₀)", labels=["analytic"])
+    return plot(Aplt, Bplt, layout=(2,1))
+end
+
+ # Testing matchAB
+#=lhs=1.0u"bohr"
 rhs=1e2u"bohr"
 k=1e-4u"bohr^-1"
-l=6
+l=1
 no_pts=1000
 wavefn=rhs_solver(k,l,pot=zero_pot,stapt=lhs,endpt=rhs,reltol=1e-10)
 ABfn=matchAB(wavefn,k,l)
@@ -138,8 +164,9 @@ function BoA_lim(AB; no_pts=1000::Int, bub=1.0, tol=1e0, warn=50::Int, stop=100:
     end
 end
 
-# Testing BoA_lim.
-lhs=0.615124u"bohr"
+
+# Testing BoA_lim
+#=lhs=0.615124u"bohr"
 rhs=1e6u"bohr"
 k=1e-4u"bohr^-1"
 l=1
@@ -149,7 +176,7 @@ Rs=LinRange(lhs,rhs,1000)
 As, Bs = getindex.(ABfn.(Rs),1), getindex.(ABfn.(Rs),2)
 plot(ustrip.(Rs), Bs./As,xlabel="R (a₀)",ylabel="B/A",legend=false,title="k=$k,l=$l")
 str="lhs=$lhs, rhs=$rhs, k=$k, l=$l, tan(δₗ) = "*string(BoA_lim(ABfn,tol=1e-4))
-@info str
+@info str =#
 
 """
 Finds scattering length of a given potential
@@ -229,8 +256,8 @@ k=1e-3u"bohr^-1"
 # Testing on hard sphere potential. Scattering length → radius as desired
 #sphere. Better for cf to analytic results to very high precision.
 #=hardradius = 1u"bohr"
-hardsphere(R) = R > hardradius ? 0u"hartree" : 1e3u"hartree"
-a = scatlen(hardsphere,lhs=hardradius)
+V_hardsphere(R)=hardsphere(R,rad=hardradius)
+a = scatlen(V_hardsphere,lhs=hardradius)
 k=1e-5u"bohr^-1"
 function σsum()
     σ=0u"cm^2"

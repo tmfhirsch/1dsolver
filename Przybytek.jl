@@ -48,7 +48,6 @@ function przybytek(R)
     return V
 end
 
-
 """
 Converts hartrees to cm⁻¹
     Input: E in Eh
