@@ -71,7 +71,7 @@ n(l,x)=sphericalbessely(l,x)
 zero_pot(R)=0.0u"hartree"
 
 """Hard sphere potential, for testing functions"""
-hardsphere(R,rad=1u"bohr") = R > rad ? 0u"hartree" : 1e3u"hartree"
+hardsphere(R; rad=1u"bohr") = R > rad ? 0u"hartree" : 1e3u"hartree"
 
 """
 Returns (Aₗ,Bₗ)(R) that match wavefunction to spherical bessel functions
@@ -94,30 +94,31 @@ end
 function AB_analytic_check(rad=1.0u"bohr", evalpt=100.0u"bohr", l=1::Int)
     Avals, Bvals = [], [] # store for AB(evalpt)
     Asols, Bsols = [], [] # store for analytic soln for AB(endpt)
-    kRange=LinRange(1e-5,1e-7,20)u"bohr^-1"
+    kRange=LinRange(1e-2,1e-12,50)u"bohr^-1"
+    pot = R -> hardsphere(R, rad=rad)
     for k in kRange
-        sol=rhs_solver(k, l, stapt=rad, endpt=evalpt)
+        sol=rhs_solver(k, l, pot=pot, stapt=rad, endpt=evalpt)
         AB = matchAB(sol, k, l)
         ABeval = AB(evalpt)
         append!(Avals, ABeval[1]) # store A evaluation
         append!(Bvals, ABeval[2]) # store B evaluation
-        analA = -rad^2*k*n(l,rad*k) # analytic A soln ~ [L]
-        analB = +rad^2*k*j(l,rad*k) # analytic B soln ~ [L]
+        analA = -rad*k*n(l,rad*k) # analytic A soln
+        analB = +rad*k*j(l,rad*k) # analytic B soln
         append!(Asols, analA) # store A analytic solution
         append!(Bsols, analB) # store B analytic solution
     end
 
     Aplt = plot(austrip.(kRange), Avals, labels=["calculated"]); plot!(austrip.(kRange), austrip.(Asols),
-    xlabel="k (a₀⁻¹)", ylabel="A (a₀)", labels=["analytic"])
+    xlabel="k (a₀⁻¹)", ylabel="A", labels=["analytic"], xscale=:log10)
     Bplt = plot(austrip.(kRange), Bvals, labels=["calculated"]); plot!(austrip.(kRange), austrip.(Bsols),
-    xlabel="k (a₀⁻¹)", ylabel="B (a₀)", labels=["analytic"])
-    return plot(Aplt, Bplt, layout=(2,1))
+    xlabel="k (a₀⁻¹)", ylabel="B", labels=["analytic"], xscale=:log10)
+    return plot(Aplt, Bplt, layout=(2,1), title=["Hard sphere; A at 100a₀, calc vs. analytic" "Hard sphere; B at 100a₀, calc vs. analytic"])
 end
 
  # Testing matchAB
 #=lhs=1.0u"bohr"
 rhs=1e2u"bohr"
-k=1e-4u"bohr^-1"
+k=1e-12u"bohr^-1"
 l=1
 no_pts=1000
 wavefn=rhs_solver(k,l,pot=zero_pot,stapt=lhs,endpt=rhs,reltol=1e-10)
