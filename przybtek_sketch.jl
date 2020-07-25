@@ -248,7 +248,8 @@ function partialσ(k,
     return uconvert(u"cm^2", σₗ)
 end
 
-"""Testing hard sphere partial cross section vs energy"""
+"""Testing hard sphere partial cross section vs energy
+24/7/20: produces a good plot"""
 function σ_energy_check(rad=1.0u"bohr")
     ls=[0,1,2,3,4]
     kRange = LinRange(1e1,1e-12,50)u"bohr^-1"
@@ -272,4 +273,19 @@ function σ_energy_check(rad=1.0u"bohr")
     labs=hcat(labs, ["total"])
     return plot(austrip.(kRange), hcat(σls,σt), xlabel="k (a₀⁻¹)", ylabel="σₗ (cm²)",
     title="Hard sphere; partial cross sections vs. wavenumber",labels=labs)
+end
+
+"""Testing hard sphere cross sections; l vs k array and cumsum array
+25/07/20: produces the correct convergence with l↑, more l needed for k↑"""
+function σ_matrix_check(rad=1.0u"bohr")
+    kRange=exp10.(1:-1:-12)u"bohr^-1"
+    lRange=0:1:20
+    pot = R -> hardsphere(R, rad=rad)
+    nok, nol = length(kRange), length(lRange) #ls form rows, ks form columns
+    lk_matrix=fill(0.0u"cm^2",(nol,nok)) # initialise matrix
+    for i=1:nol, j=1:nok
+        lk_matrix[i,j]=partialσ(kRange[j],lRange[i],pot=pot)
+    end
+    cs_matrix=cumsum(lk_matrix,dims=1)
+    return lk_matrix, cs_matrix
 end
