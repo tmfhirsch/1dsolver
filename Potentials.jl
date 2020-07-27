@@ -6,7 +6,7 @@ Description last updates 27/07/2020
 =#
 module Potentials
 
-using Unitful, UnitfulAtomic, Interpolations
+using Unitful, UnitfulAtomic, Dierckx
 using Plots
 
 ################################################################################
@@ -61,7 +61,7 @@ hartree2wavenumber(E)=uconvert(u"cm^-1", E/u"h*c")
 
 #=#Test plot of przybytek potential
 Rgrid = LinRange(5,26,10001)u"bohr"
-Vgrid = przybytek.(Rgrid) # Eₕ
+Vgrid = Quintet.(Rgrid) # Eₕ
 νgrid = hartree2wavenumber.(Vgrid) # cm⁻¹
 
 plot(ustrip.(Rgrid), ustrip.(νgrid),
@@ -80,7 +80,7 @@ plot(ustrip.(Rgrid), ustrip.(νgrid),
 hartree2eV(E) = uconvert(u"eV", E)
 
 """
-    Müller Singlet potential, interpolated linearly
+    Müller Singlet potential, interpolated with cubic spline (DC recommendation)
     and fitted with a decaying exponential to the Przybytek potential for R>14a₀.
     Input: Radial distance R (distance units, pref. a₀)
     Output: ¹Σ⁺g(R) (Eₕ)
@@ -104,7 +104,7 @@ function Singlet(R)
                  -91.1,
                  -50.4,
                  -15.8]
-    interp_pot_unitless = LinearInterpolation(interp_Rs, interp_Vs) #TODO cubic interp for regular grid R ≦ 8a₀?
+    interp_pot_unitless = Spline1D(interp_Rs, interp_Vs, k=3)
     interp_pot(R) = uconvert.(u"hartree",interp_pot_unitless(austrip(R))*1.0u"meV")
     # Exponential decay exchange function
     A₁, β₁ = 5.9784u"hartree", 0.7367u"bohr^-1" # values from Cocks 2019
@@ -119,9 +119,9 @@ function Singlet(R)
     end
 end
 
-#=# Test plot of Singlet potential, cf. Fig 6 and Table 4 of Müller
+# Test plot of Singlet potential, cf. Fig 6 and Table 4 of Müller
 # Tested correct as of 27/07/20
-Rs=LinRange(3,18,100)u"bohr"
+#=Rs=LinRange(3,18,100)u"bohr"
 vals=uconvert.(u"eV", Singlet.(Rs))
 plot(ustrip.(Rs),ustrip.(vals))
 vline!([6.15])
@@ -132,7 +132,7 @@ hline!([-0.6677])=#
 ################################################################################
 
 """
-    Müller Triplet potential, interpolated linearly
+    Müller Triplet potential, interpolated with cubic spline (DC recommendation)
     and fitted with a decaying exponential to the Przybytek potential for R>14a₀.
     Input: Radial distance R (distance units, pref. a₀)
     Output: ¹Σ⁺g(R) (Eₕ)
@@ -156,7 +156,7 @@ function Triplet(R)
                  -77.8,
                  -45.1,
                  -15.3]
-    interp_pot_unitless = LinearInterpolation(interp_Rs, interp_Vs) #TODO cubic interp for regular grid R ≦ 8a₀?
+    interp_pot_unitless = Spline1D(interp_Rs, interp_Vs, k=3)
     interp_pot(R) = uconvert.(u"hartree",interp_pot_unitless(austrip(R))*1.0u"meV")
     # Exponential decay exchange function
     A₃, β₃ = 1.7980u"hartree", 0.6578u"bohr^-1" # values from Cocks 2019
@@ -171,9 +171,9 @@ function Triplet(R)
     end
 end
 
-#=# Test plot of Triplet potential, cf. Fig 6 and Table 4 of Müller
+# Test plot of Triplet potential, cf. Fig 6 and Table 4 of Müller
 # Tested correct as of 27/07/20
-Rs=LinRange(3,18,100)u"bohr"
+#=Rs=LinRange(3,18,100)u"bohr"
 vals=uconvert.(u"eV", Triplet.(Rs))
 plot(ustrip.(Rs),ustrip.(vals))
 vline!([6.10])
