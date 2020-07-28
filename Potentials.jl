@@ -110,8 +110,7 @@ function Singlet(R)
     A₁, β₁ = 5.9784u"hartree", 0.7367u"bohr^-1" # values from Cocks 2019
     exch_pot(R) = A₁*exp(-β₁*R)
     if R < 3.0u"bohr" # within min range of Müller values
-        @warn "Within radius of Müller tabulated values"
-        return interp_pot(3.0u"bohr")
+        error("R=$R, within radius of Müller tabulated values")
     elseif R < 14.0u"bohr" # within tabulated value range
         return interp_pot(R)
     else # asymptotic fit to quintet potential
@@ -162,8 +161,7 @@ function Triplet(R)
     A₃, β₃ = 1.7980u"hartree", 0.6578u"bohr^-1" # values from Cocks 2019
     exch_pot(R) = A₃*exp(-β₃*R)
     if R < 3.0u"bohr" # within min range of Müller values
-        @warn "Within radius of Müller tabulated values"
-        return interp_pot(3.0u"bohr")
+        error("R=$R, within radius of Müller tabulated values")
     elseif R < 14.0u"bohr" # within tabulated value range
         return interp_pot(R)
     else # asymptotic fit to quintet potential

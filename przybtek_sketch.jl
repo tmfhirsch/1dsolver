@@ -8,19 +8,19 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Revise
 using OrdinaryDiffEq, Plots, LinearAlgebra, StaticArrays, SpecialFunctions, Statistics
 using Unitful, UnitfulAtomic
-using Przybytek: przybytek
+using Potentials: Quintet
 
 
 """
 TISE solver for IC of (u,u')=(0,1)
 All inputs in units, or assumed to be in atomic units if not.
-Inputs: k, l; lhs~[L], rhs~[R], U(R)=przybytek, μ=He₂ mass, reltol for DE solver
+Inputs: k, l; lhs~[L], rhs~[R], U(R)=Quintet, μ=He₂ mass, reltol for DE solver
 Output: (u,u')~(a₀,1) as fn of R~a₀"""
 function rhs_solver(k, # wavenumber [L]⁻¹
                     l::Int; # angular momentum
                     stapt=1.0u"bohr", # location of IC [L]
                     endpt=100.0u"bohr", # RHS to be solved to [L]
-                    pot=przybytek, # interatomic potential [L]->[E]
+                    pot=Quintet, # interatomic potential [L]->[E]
                     μ=0.5*4.002602u"u", # He₂ reduced mass [M]
                     reltol=1e-10, #relative tolerance for DE solver
                     maxiters=1e6 #max iterations for DE solver
@@ -52,15 +52,17 @@ function rhs_solver(k, # wavenumber [L]⁻¹
 end
 
 #Testing rhs_solver
-#=plot_k=1e-5u"bohr^-1"
-plot_l=0
-plot_stapt=1.0u"bohr"
-plot_endpt=1e6u"bohr"
-sol=rhs_solver(plot_k,plot_l,stapt=plot_stapt,endpt=plot_endpt)
-Rs=LinRange(plot_stapt,plot_endpt,1000)
-us=[i[1] for i in sol.(Rs)]
-plot(ustrip.(Rs), ustrip.(us), legend=false, title="k=$plot_k")
-#savefig("prz_wfn_ϵ-$plot_ϵ.png")=#
+function test_rhs_solver()
+    plot_k=1e-5u"bohr^-1"
+    plot_l=0
+    plot_stapt=3.0u"bohr"
+    plot_endpt=1e6u"bohr"
+    sol=rhs_solver(plot_k,plot_l,stapt=plot_stapt,endpt=plot_endpt)
+    Rs=LinRange(plot_stapt,plot_endpt,1000)
+    us=[i[1] for i in sol.(Rs)]
+    plot(ustrip.(Rs), ustrip.(us), legend=false, title="k=$plot_k")
+    #savefig("prz_wfn_ϵ-$plot_ϵ.png")
+end
 
 """
 Spherical bessel functions
@@ -225,7 +227,7 @@ function scatlen(pot; # potential
 end
 
 # Testing scatlen
-#@info scatlen(przybytek)
+#@info scatlen(Quintet)
 
 
 """
@@ -235,7 +237,7 @@ Outputs: σₗ~[L]^2 (cm^2 by default)
 """
 function partialσ(k,
                   l::Int;
-                  pot=przybytek,
+                  pot=Quintet,
                   lhs=1.0u"bohr", #lhs for DE solver
                   rhs=1e4u"bohr", #rhs for DE solver
                   μ=0.5*4.002602u"u" # reduced mass
