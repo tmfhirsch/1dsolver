@@ -12,10 +12,12 @@ using Potentials: Singlet, Triplet, Quintet
 using Plots
 
 """
-TISE solver for (u₁,u₂,u₃,<derivs>) with IC of (0,0,0,1,1,1)
+    TISE solver for (u₁,u₂,u₃,u₁',u₂',u₃') with IC of (0,0,0,1,1,1)
+    Inputs: ϵ~[E], l::Int; stapt/endpt for DE solver~[L], potentials~[L]->[E],
+    μ~[M], reltol and maxiters for DE solver
+    Outputs: DE solution for (u₁,u₂,u₃,u₁',u₂',u₃')~([L],[L],[L],1,1,1)
 """
-
-function solver(k, # wavenumber [L]⁻¹
+function solver(ϵ, # energy ~ [E]
                 l::Int; # angular momentum
                 stapt=3.0u"bohr", # location of IC [L]
                 endpt=100.0u"bohr", # RHS to be solved to [L]
@@ -26,7 +28,6 @@ function solver(k, # wavenumber [L]⁻¹
                 reltol=1e-10, #relative tolerance for DE solver
                 maxiters=1e6 #max iterations for DE solver
                 )
-    ϵ=auconvert(k^2*1u"ħ^2"/(2*μ)) # E=ħ²k²/2μ
     # add centrifugal potential
     V1 = R -> auconvert(pot1(R)+l*(l+1)u"ħ^2"/(2*μ*R^2))
     V2 = R -> auconvert(pot2(R)+l*(l+1)u"ħ^2"/(2*μ*R^2))
@@ -62,22 +63,48 @@ function solver(k, # wavenumber [L]⁻¹
     return sol
 end
 
-# Test solver
+# Test solver - can compare to test_rhs_solver in przybytek_sketch.jl
 function test_solver()
-    k=1e-5u"bohr^-1"
-    l=0
-    plot_k=1e-5u"bohr^-1"
+    plot_ϵ=1e-14u"hartree"
     plot_l=0
     plot_stapt=3.0u"bohr"
     plot_endpt=1e6u"bohr"
-    sol=solver(plot_k,plot_l,stapt=plot_stapt,endpt=plot_endpt)
+    sol=solver(plot_ϵ,plot_l,stapt=plot_stapt,endpt=plot_endpt)
     Rs=LinRange(plot_stapt,plot_endpt,1000)
     sols=sol.(Rs)
     S_us=getindex.(sols,1) # singlet
     T_us=getindex.(sols,2) # triplet
     Q_us=getindex.(sols,3) # quintet
-    Splt=plot(ustrip.(Rs), ustrip.(S_us), legend=false, title="Singlet, k=$plot_k")
-    Tplt=plot(ustrip.(Rs), ustrip.(T_us), legend=false, title="Triplet, k=$plot_k")
-    Qplt=plot(ustrip.(Rs), ustrip.(Q_us), legend=false, title="Quintet, k=$plot_k")
+    Splt=plot(ustrip.(Rs), ustrip.(S_us), legend=false, title="Singlet, ϵ=$plot_ϵ")
+    Tplt=plot(ustrip.(Rs), ustrip.(T_us), legend=false, title="Triplet, ϵ=$plot_ϵ")
+    Qplt=plot(ustrip.(Rs), ustrip.(Q_us), legend=false, title="Quintet, ϵ=$plot_ϵ")
     plot(Splt,Tplt,Qplt,layout=(3,1))
+end
+
+
+"""
+Spherical bessel functions
+"""
+j(l,x)=sphericalbesselj(l,x)
+n(l,x)=sphericalbessely(l,x)
+
+
+"""
+    Returns (Aₗ,Bₗ)(R) that match wavefunction to spherical bessel functions
+    Inputs: (u,u')(R) solution ~ ([L],1), ϵ~[E], V(R)~[L]→[E], l; μ~[M]
+    Output: (Aₗ,Bₗ)(R) for k matching ħ²k(R)²/2m = ϵ-V(R), for that partial wave
+"""
+function matchAB(sol, # (u,u')(R) ~ [L]->([L],1)
+                 ϵ, # energy ~ [E]
+                 pot, # potential ~[L]->[E]
+                 l; # ang mom
+                 μ=0.5*4.002602u"u", # He₂ reduced mass [M]
+                 )
+    @assert l>=0 "l=$l is not a valid angular momentum"
+    ϵₖ(R)=ϵ-pot(R) # kinetic energy
+    k=auconvert(sqrt(2*μ*ϵ)/1u"ħ") # kinetic energy wavenumber
+    M = R -> [R*j(l,k*R)                    R*n(l,k*R); #Rjₗ(kR), Rnₗ(kR) & derivs
+              (l+1)*j(l,k*R)-k*R*j(l+1,k*R) (l+1)*n(l,k*R)-k*R*n(l+1,k*R)]
+    AB = R -> ustrip.(M(R))\ustrip.(sol(R))
+    return AB
 end
