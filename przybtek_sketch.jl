@@ -1,4 +1,4 @@
-#= Playing around with matching coefficients with Przybytek quintet potential,
+ #= Playing around with matching coefficients with Przybytek quintet potential,
 with the aim of producing a scattering length
 
 Description last updated 14/07/20=#
@@ -8,7 +8,7 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Revise
 using OrdinaryDiffEq, Plots, LinearAlgebra, StaticArrays, SpecialFunctions, Statistics
 using Unitful, UnitfulAtomic
-using Potentials: Quintet
+using Potentials: Quintet, Singlet, Triplet
 
 
 """
@@ -78,10 +78,10 @@ hardsphere(R; rad=1u"bohr") = R > rad ? 0u"hartree" : 1e3u"hartree"
 
 """
 Returns (Aₗ,Bₗ)(R) that match wavefunction to spherical bessel functions
-Inputs: (u,u')(R) solution ~ (1,[L]⁻¹), k ~ [L⁻¹], l
+Inputs: (u,u')(R) solution ~ ([L],1), k ~ [L⁻¹], l
 Outputs: (Aₗ,Bₗ)(R)
 """
-function matchAB(sol, #(u,u')(R) ~ [L]->(1,[L]⁻¹)
+function matchAB(sol, #(u,u')(R) ~ [L]->([L],1)
                  k, # [L]⁻¹
                  l::Int # ang. momentum
                  )
@@ -189,7 +189,7 @@ warning index, max index
 Output: a in nanometres, or an error if max index reached
 """
 function scatlen(pot; # potential
-                 lhs=1u"bohr", # start point for solving DE
+                 lhs=3.0u"bohr", # start point for solving DE
                  rhs=1e4u"bohr", # end pt for solving DE
                  μ=0.5*4.002602u"u", # reduced mass
                  strt=5.0, # start i for k=10^-i
