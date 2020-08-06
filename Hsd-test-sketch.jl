@@ -1,6 +1,8 @@
 #= Comparing my H_sd coupling scheme with the coupling scheme of Cocks
 et al. (2019)=#
-using WignerSymbols
+push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
+
+using WignerSymbols, Wigner9j
 
 """Structure to hold quantum numbers of the form
     |S₁ S₂ S mS l ml ⟩
@@ -13,6 +15,17 @@ mutable struct α
     l :: Int
     ml :: Int
 end
+
+"""Redefined CG, returns 0 for unphysical (jᵢ,mᵢ) combination (instead of error)"""
+function clebschgordan_lax(j₁,m₁,j₂,m₂,j₃,m₃=m₁+m₂)
+    for (jᵢ,mᵢ) in ((j₁, m₁), (j₂, m₂), (j₃, m₃))
+        if !WignerSymbols.ϵ(jᵢ,mᵢ) # unphysical jᵢ,mᵢ entered
+            return 0::Int
+        end
+    end
+    return clebschgordan(j₁,m₁,j₂,m₂,j₃,m₃) # if all good, send on to CG calc
+end
+
 
 """My coupling scheme, current as of 4/8/20.
     Inputs: α',α
@@ -33,16 +46,16 @@ function my_scheme(α_::α, α::α)
         Csum=0
         for C in abs(S-S_):1:(S+S_) # inner sum
             Cterm = (2C+1)
-            Cterm *= clebschgordan(l_,0,C,0,l,0)
-            Cterm *= clebschgordan(l_,ml_,C,mS-mS_,l,ml)
-            Cterm *= clebschgordan(S_,mS_,C,mS-mS_,S,mS)
-            Cterm *= clebschgordan(S_,Ωₛ,C,0,S,Ωₛ)
+            Cterm *= clebschgordan_lax(l_,0,C,0,l,0)
+            Cterm *= clebschgordan_lax(l_,ml_,C,mS-mS_,l,ml)
+            Cterm *= clebschgordan_lax(S_,mS_,C,mS-mS_,S,mS)
+            Cterm *= clebschgordan_lax(S_,Ωₛ,C,0,S,Ωₛ)
             Csum += Cterm
             Cterm = 0
         end
         term = Ω₁*Ω₂
-        term *= clebschgordan(S₁,Ω₁,S₂,Ω₂,S_,Ωₛ)
-        term *= clebschgordan(S₁,Ω₁,S₂,Ω₂,S,Ωₛ)
+        term *= clebschgordan_lax(S₁,Ω₁,S₂,Ω₂,S_,Ωₛ)
+        term *= clebschgordan_lax(S₁,Ω₁,S₂,Ω₂,S,Ωₛ)
         term *= Csum
         Ωsum += term
         term = 0
@@ -57,13 +70,15 @@ function my_scheme(α_::α, α::α)
     return coupling_term + diag_term
 end
 
-
+#=
 # Test that my scheme runs
 function test_my_scheme()
     testα_=α(1,1,1,1,0,0)
     testα=α(1,1,2,0,1,1)
     my_scheme(testα_,testα)
 end
+=#
+
 
 """ Coupling scheme from Cocks et al. (2019)
     Inputs: (α', α) quantum numbers in that order
@@ -77,13 +92,49 @@ function cocks2019_scheme(α_::α, α::α)
     if mS_+ml_ != mS+ml
         return 0
     end
-    term=(-1)^(mS_-mS) #(-1)^(mₛ₋-mₛ) factor
-    term *= clebschgordan(S,mS,2,mS_-mS,S_,mS_)
-    term *= clebschgordan(l,ml,2,ml_-ml,l_,ml_)
-    #TODO tensor factors
+    eval=(-1)^(mS_-mS) #(-1)^(mₛ₋-mₛ) factor
+    eval *= clebschgordan(S,mS,2,mS_-mS,S_,mS_)
+    eval *= clebschgordan(l,ml,2,ml_-ml,l_,ml_)
+    eval *= TTensor((S₁_,S₂_),S_, (S₁,S₂),S)
+    eval *= sqrt((2*l+1)/(2*l_+1))*clebschgordan(l,0,2,0,l_,0)
+    return sqrt(6)*eval
 end
 
-"""Wigner 9j calculator, based off expression (1998) doi: 10.1063/1.168745"""
-function wigner9j(j1,j2,j3,j4,j5,j6,j7,j8,j9)
-    #TODO
+""" ⟨γ',S'|𝐓²|γ,S⟩/ħ² from (36) in Cocks et al (2019)
+    Inputs: γ'={S1',S2'}, S', γ={S1,S2}, S
+    Outputs: ⟨γ',S'|𝐓²|γ,S⟩/ħ²"""
+function TTensor(γ_,S_,γ,S)
+    S1_, S2_ = γ_[1], γ_[2]
+    S1, S2 = γ[1], γ[2]
+    if γ_ != γ #δᵧ_ᵧ term
+        return 0
+    end
+    eval = sqrt(5*S1*(S1+1)*S2*(S2+1))
+    eval*= sqrt((2*S1+1)*(2*S2+1)*(2*S+1))
+    eval*= wigner9j(S1,S2,S,1,1,2,S1,S2,S_)
+    return eval
 end
+
+# test my scheme against Cocks 2019
+function tester(tol=1e-10)
+    α1=α(1,1,2,-1,2,0)
+    α2=α(1,1,1,0,0,0)
+    α3=α(1,1,0,0,1,-1)
+    α4=α(1,1,2,1,2,1)
+    αs=[α1,α2,α3,α4]
+    for α_ in αs, α in αs
+        println("α'=$α_, α=$α")
+        if abs(my_scheme(α_,α)-cocks2019_scheme(α_,α))>=tol
+            @info α_, α, "Disagreement between my scheme and Cocks (2019)"
+            @info "My scheme produces" my_scheme(α_,α)
+            @info "Cocks (2019) scheme produces" cocks2019_scheme(α_,α)
+            return
+        end
+    end
+end
+
+#playing around outside fn
+α1=α(1,1,2,-1,2,0)
+α2=α(1,1,1,0,0,0)
+α3=α(1,1,0,0,1,-1)
+α4=α(1,1,2,1,2,1)
