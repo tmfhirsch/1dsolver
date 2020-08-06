@@ -67,4 +67,23 @@ end
 
 """ Coupling scheme from Cocks et al. (2019)
     Inputs: (α', α) quantum numbers in that order
-    Outputs: 
+    Outputs: √6/ħ^2 *Dₐₐ_ as defined in (35) from the paper
+"""
+function cocks2019_scheme(α_::α, α::α)
+    #unpack quantum numbers
+    S₁_,S₂_,S_,mS_,l_,ml_=α_.S₁,α_.S₂,α_.S,α_.mS,α_.l,α_.ml
+    S₁, S₂, S, mS, l, ml = α.S₁, α.S₂, α.S, α.mS, α.l, α.ml
+    #δ(mₛ_+mₗ_,mₛ+mₗ) factor
+    if mS_+ml_ != mS+ml
+        return 0
+    end
+    term=(-1)^(mS_-mS) #(-1)^(mₛ₋-mₛ) factor
+    term *= clebschgordan(S,mS,2,mS_-mS,S_,mS_)
+    term *= clebschgordan(l,ml,2,ml_-ml,l_,ml_)
+    #TODO tensor factors
+end
+
+"""Wigner 9j calculator, based off expression (1998) doi: 10.1063/1.168745"""
+function wigner9j(j1,j2,j3,j4,j5,j6,j7,j8,j9)
+    #TODO
+end
