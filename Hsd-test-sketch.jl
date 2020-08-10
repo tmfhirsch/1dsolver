@@ -27,6 +27,7 @@ function clebschgordan_lax(j₁,m₁,j₂,m₂,j₃,m₃=m₁+m₂)
 end
 
 
+
 """My coupling scheme, current as of 4/8/20.
     Inputs: α',α
     Outputs: ⟨α'|̂Hsd|α'⟩×(-R^3/ξ)
@@ -36,9 +37,7 @@ function my_scheme(α_::α, α::α)
     S₁_,S₂_,S_,mS_,l_,ml_=α_.S₁,α_.S₂,α_.S,α_.mS,α_.l,α_.ml
     S₁, S₂, S, mS, l, ml = α.S₁, α.S₂, α.S, α.mS, α.l, α.ml
     #Δₛ₁ₛ₂ factor
-    if S₁!=S₁_ || S₁!=S₂_
-        return false
-    end
+    (S₁==S₁_ && S₂==S₂_) || return false
     # First, coupling term
     Ωsum=0
     for Ωₛ in max(-S,-S_):1:min(S,S_), Ω₁ in -S₁:1:S₁, Ω₂ in -S₂:1:S₂ # outer sum
@@ -47,8 +46,8 @@ function my_scheme(α_::α, α::α)
         for C in abs(S-S_):1:(S+S_) # inner sum
             Cterm = (2C+1)
             Cterm *= clebschgordan_lax(l_,0,C,0,l,0)
-            Cterm *= clebschgordan_lax(l_,ml_,C,mS-mS_,l,ml)
-            Cterm *= clebschgordan_lax(S_,mS_,C,mS-mS_,S,mS)
+            Cterm *= clebschgordan_lax(l_,ml_,C,+mS-mS_,l,ml) #TODO Changed 10/8
+            Cterm *= clebschgordan_lax(S_,mS_,C,-mS+mS_,S,mS)
             Cterm *= clebschgordan_lax(S_,Ωₛ,C,0,S,Ωₛ)
             Csum += Cterm
             Cterm = 0
@@ -67,18 +66,23 @@ function my_scheme(α_::α, α::α)
     else
         diag_term = -0.5*(S*(S+1)-S₁*(S₁+1)-S₂*(S₂+1))
     end
-    return coupling_term + diag_term
+    return (coupling_term + diag_term)*(-1)^(mS_-mS) #TODO changed 10/8
 end
 
-#=
-# Test that my scheme runs
-function test_my_scheme()
-    testα_=α(1,1,1,1,0,0)
-    testα=α(1,1,2,0,1,1)
-    my_scheme(testα_,testα)
+""" ⟨γ',S'|𝐓²|γ,S⟩/ħ² from (36) in Cocks et al (2019)
+    Inputs: γ'={S1',S2'}, S', γ={S1,S2}, S
+    Outputs: ⟨γ',S'|𝐓²|γ,S⟩/ħ²"""
+function TTensor(γ_,S_,γ,S)
+    S1_, S2_ = γ_[1], γ_[2]
+    S1, S2 = γ[1], γ[2]
+    if γ_ != γ #δᵧ_ᵧ
+        return 0
+    end
+    eval = sqrt(5*S1*(S1+1)*S2*(S2+1))
+    eval*= sqrt((2*S1+1)*(2*S2+1)*(2*S+1))
+    eval*= wigner9j(S1,S2,S,1,1,2,S1,S2,S_)
+    return eval
 end
-=#
-
 
 """ Coupling scheme from Cocks et al. (2019)
     Inputs: (α', α) quantum numbers in that order
@@ -93,48 +97,41 @@ function cocks2019_scheme(α_::α, α::α)
         return 0
     end
     eval=(-1)^(mS_-mS) #(-1)^(mₛ₋-mₛ) factor
-    eval *= clebschgordan(S,mS,2,mS_-mS,S_,mS_)
-    eval *= clebschgordan(l,ml,2,ml_-ml,l_,ml_)
+    eval *= clebschgordan_lax(S,mS,2,mS_-mS,S_,mS_)
+    eval *= clebschgordan_lax(l,ml,2,ml_-ml,l_,ml_)
     eval *= TTensor((S₁_,S₂_),S_, (S₁,S₂),S)
-    eval *= sqrt((2*l+1)/(2*l_+1))*clebschgordan(l,0,2,0,l_,0)
+    eval *= sqrt((2*l+1)/(2*l_+1))*clebschgordan_lax(l,0,2,0,l_,0)
     return sqrt(6)*eval
 end
 
-""" ⟨γ',S'|𝐓²|γ,S⟩/ħ² from (36) in Cocks et al (2019)
-    Inputs: γ'={S1',S2'}, S', γ={S1,S2}, S
-    Outputs: ⟨γ',S'|𝐓²|γ,S⟩/ħ²"""
-function TTensor(γ_,S_,γ,S)
-    S1_, S2_ = γ_[1], γ_[2]
-    S1, S2 = γ[1], γ[2]
-    if γ_ != γ #δᵧ_ᵧ term
-        return 0
-    end
-    eval = sqrt(5*S1*(S1+1)*S2*(S2+1))
-    eval*= sqrt((2*S1+1)*(2*S2+1)*(2*S+1))
-    eval*= wigner9j(S1,S2,S,1,1,2,S1,S2,S_)
-    return eval
-end
-
-# test my scheme against Cocks 2019
-function tester(tol=1e-10)
-    α1=α(1,1,2,-1,2,0)
-    α2=α(1,1,1,0,0,0)
-    α3=α(1,1,0,0,1,-1)
-    α4=α(1,1,2,1,2,1)
-    αs=[α1,α2,α3,α4]
-    for α_ in αs, α in αs
-        println("α'=$α_, α=$α")
-        if abs(my_scheme(α_,α)-cocks2019_scheme(α_,α))>=tol
-            @info α_, α, "Disagreement between my scheme and Cocks (2019)"
-            @info "My scheme produces" my_scheme(α_,α)
-            @info "Cocks (2019) scheme produces" cocks2019_scheme(α_,α)
-            return
+""" Exhaustive tester of my ̂Hsd scheme vs Cocks (2019), over all possible |α⟩
+    If there is disagreement beyond <tol> for any bra/ket combination, that
+    combination will be returned."""
+function exhaustive_tester(lmax=4::Int,tol=1e-10)
+    S₁, S₂ = 1, 1 # He* atoms have spins of 1
+    for S in abs(S₁-S₂):1:(S₁+S₂)
+        for mS in -S:1:S
+            for l in 0:1:lmax
+                for ml in -l:1:l
+                    ket=α(S₁,S₂,S,mS,l,ml) # define ket
+                    # now iterate over all possible bras
+                    for S_ in abs(S₁-S₂):1:(S₁+S₂)
+                        for mS_ in -S_:1:S_
+                            for l_ in 0:1:lmax
+                                for ml_ in -l_:1:l_
+                                    bra=α(S₁,S₂,S_,mS_,l_,ml_) # define bra
+                                    # test and compare
+                                    if abs(my_scheme(bra,ket)-cocks2019_scheme(bra,ket))>tol
+                                        return "Fail for: ", bra, ket
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
+    # success!
+    println("All in agreement! l up to $lmax")
 end
-
-#playing around outside fn
-α1=α(1,1,2,-1,2,0)
-α2=α(1,1,1,0,0,0)
-α3=α(1,1,0,0,1,-1)
-α4=α(1,1,2,1,2,1)

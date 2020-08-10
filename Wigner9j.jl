@@ -11,7 +11,8 @@ using HalfIntegers, WignerSymbols
     Inputs: a,...,j into \n⌈a b c⌉
                             \n{d e f}
                             \n⌊g h j⌋\n
-    Outputs: Evaluation of the Wigner 9-j symbol"""
+    Outputs: Evaluation of the Wigner 9-j symbol
+    Tested successfully against Wei Table 1 10/08/20"""
 function wigner9j(a,b,c,d,e,f,g,h,j)
     # Checks that each jᵢ is a (half-)integer, as all angular momenta should be
     for i in (a,b,c,d,e,f,g,h,j)
@@ -43,9 +44,34 @@ function wigner9j(a,b,c,d,e,f,g,h,j)
     return eval
 end
 
+"""     Recursive binomial function, to reduce overflow when calculating large
+        9j symbols. Uses ⁿCₖ=ⁿCₖ₋₁*((n+1)-k)/k
+        Inputs: n, k integers
+        Outputs: Binomial (ⁿCₖ)"""
+function WeiBinomial(n::Int, k::Int)
+    0 <= k <= n || return 0
+    x=big(1)
+    while k>0
+        x*=((n+1)-k)//k
+        k-=1
+    end
+    #k=0
+    return x
+end
 
-""" Δ(a b c) as defined below eqn (1) in Wei (1998)
-    DEPRICATED: function Δ in WignerSymbols does this"""
+""" Test recursive binomial # Tested successfully 10/08/20"""
+function WeiBinomTest()
+    rands1=convert.(Int, ceil.(rand(100).*20))
+    rands2=convert.(Int, ceil.(rand(100).*20))
+    for n in rands1, k in rands2
+        WeiBinomial(n,k)==binomial(n,k) || return("Fail for $n, $k")
+    end
+    println("Success!")
+end
+
+
+"""     DEPRICATED: function Δ in WignerSymbols does this
+        Δ(a b c) as defined below eqn (1) in Wei (1998)"""
 function WeiΔ(a,b,c)
     if !δ(a,b,c) # first check triangle condition is upheld
         throw(DomainError((a,b,c),"Do not satisfy the triangle relation"))
@@ -71,7 +97,7 @@ function Wei6(m1,m2,m3,m4,m5,m6)
         # build construct term to add to sum
         term=(-1)^n
         # define binomial to deal with the HalfInt data type
-        bn(x,y)=binomial(convert(Int,x),convert(Int,y))
+        bn(x,y)=WeiBinomial(convert(Int,x),convert(Int,y))
         term*=bn(n+1,n-m1-m5-m6)
         term*=bn(m1+m5-m6,n-m2-m4-m6)
         term*=bn(m1-m5+m6,n-m3-m4-m5)
