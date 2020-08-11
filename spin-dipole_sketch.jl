@@ -31,6 +31,7 @@ end
 """My coupling scheme, current as of 4/8/20.
     Inputs: α',α
     Outputs: ⟨α'|̂Hsd|α'⟩×(-R^3/ξ)
+    Checked IN AGREEMENT WITH COCKS (2019) after making changes # 10/8
 """
 function my_scheme(α_::α, α::α)
     #unpack quantum numbers
@@ -46,8 +47,8 @@ function my_scheme(α_::α, α::α)
         for C in abs(S-S_):1:(S+S_) # inner sum
             Cterm = (2C+1)
             Cterm *= clebschgordan_lax(l_,0,C,0,l,0)
-            Cterm *= clebschgordan_lax(l_,ml_,C,+mS-mS_,l,ml) #TODO Changed 10/8
-            Cterm *= clebschgordan_lax(S_,mS_,C,-mS+mS_,S,mS)
+            Cterm *= clebschgordan_lax(l_,ml_,C,-mS+mS_,l,ml) #TODO Changed 10/8
+            Cterm *= clebschgordan_lax(S_,mS_,C,mS-mS_,S,mS)
             Cterm *= clebschgordan_lax(S_,Ωₛ,C,0,S,Ωₛ)
             Csum += Cterm
             Cterm = 0
@@ -71,17 +72,16 @@ end
 
 """ ⟨γ',S'|𝐓²|γ,S⟩/ħ² from (36) in Cocks et al (2019)
     Inputs: γ'={S1',S2'}, S', γ={S1,S2}, S
-    Outputs: ⟨γ',S'|𝐓²|γ,S⟩/ħ²"""
+    Outputs: ⟨γ',S'|𝐓²|γ,S⟩/ħ²
+    Tested for γ=(1,1) against ¶ below (37) in Cocks (2019) 10/08/20"""
 function TTensor(γ_,S_,γ,S)
     S1_, S2_ = γ_[1], γ_[2]
     S1, S2 = γ[1], γ[2]
-    if γ_ != γ #δᵧ_ᵧ
-        return 0
-    end
-    eval = sqrt(5*S1*(S1+1)*S2*(S2+1))
-    eval*= sqrt((2*S1+1)*(2*S2+1)*(2*S+1))
-    eval*= wigner9j(S1,S2,S,1,1,2,S1,S2,S_)
-    return eval
+    γ_ == γ || return 0 #δᵧ_ᵧ
+    x = sqrt(5*S1*(S1+1)*S2*(S2+1))
+    x*= sqrt((2*S1+1)*(2*S2+1)*(2*S+1))
+    x*= wigner9j(S1,S2,S,1,1,2,S1,S2,S_)
+    return x
 end
 
 """ Coupling scheme from Cocks et al. (2019)
