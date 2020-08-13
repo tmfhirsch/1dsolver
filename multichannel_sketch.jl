@@ -6,6 +6,7 @@ Description last updated 12/08/20=#
 using Revise
 using HalfIntegers, LinearAlgebra, StaticArrays, OrdinaryDiffEq
 using Unitful, UnitfulAtomic
+using Plots
 
 """ |a⟩=|Γ,f,l,J,mJ,XS⟩ structure"""
 struct α_nos
@@ -48,7 +49,7 @@ end
 
 #TODO TISE solver. Input: lookup, lhs, rhs. Output: sol(R)
 """multichannel TISE solver
-    Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]→[E],
+    Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]×[M]→[E],
     energy~[E], lhs~[L], rhs~[L]
     Output: sol(R) [where R ∈ (lhs,rhs)] ~ IC"""
 function solver(lookup, IC, pot, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
@@ -86,7 +87,7 @@ function solver(lookup, IC, pot, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
         # Construct V(R) matrix
         V = zeros(n,n)u"hartree" # initialise
         for i=1:n, j=1:n
-            V[i,j] = pot(lookup[i], lookup[j], x*1u"bohr")
+            V[i,j] = pot(lookup[i], lookup[j], x*1u"bohr", μ)
         end
         V⁰=austrip.(V) # strip units from V
         M = (-2μ⁰/ħ⁰^2)*(ϵ⁰*I-V⁰) # double derivative matix
@@ -107,10 +108,10 @@ end
 
 """ test function for solver - runs for zero potential
     Tested successfully 12/08/2020"""
-function solver_tester()
-    V(bra,ket,R)=0u"hartree" # free
+function test_solver()
+    V(bra,ket,R,μ)=0u"hartree" # free
     lhs, rhs = 1.0u"bohr", 100u"bohr"
-    ϵ=1e-3u"hartree"
+    ϵ=1e-5u"hartree"
     lookup=lookup_generator(0) # s-wave only
     n=length(lookup)
     IC=SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
@@ -122,5 +123,35 @@ end
 
 #TODO interactions. Inputs: ⟨α'|, |α⟩, R. Output: energy of that matrix el at that R
 """Rotational interaction"""
+function H_rot(bra,ket,R,μ)
+    # delta function
+    bra == ket || return 0.0u"hartree"
+    l=ket.l
+    return uconvert(u"hartree", l*(l+1)*1.0u"ħ^2"/(2*μ*R^2))
+end
+
+# test of rotational interaction
+function test_H_rot()
+    V(bra,ket,R,μ)=H_rot(bra,ket,R,μ)
+    lhs, rhs = 1.0u"bohr", 100u"bohr"
+    ϵ=1e-5u"hartree"
+    lookup=lookup_generator(1) # s-wave only
+    n=length(lookup)
+    IC=SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
+    sol=solver(lookup, IC, V, ϵ, lhs, rhs)
+    Rs=LinRange(lhs,rhs,1000)
+    vals1 = getindex.(sol.(Rs),1); vals10 = getindex.(sol.(Rs),10)
+    vals2 = getindex.(sol.(Rs),2); vals11 = getindex.(sol.(Rs),11)
+    vals=hcat(vals1,vals10,vals2,vals11)
+    plot(austrip.(Rs), austrip.(vals),title="If you see this, solver runs for H_rot")
+    end
+
+"""Electronic interaction (Born Oppenheimer approximation)"""
+function H_el(bra,ket,R,μ)
+end
+
+#TODO Spin-Dipole interaction
+
+#TODO hyperfine interaction
 
 #TODO in2out_solver. Inputs: defaults=(see notebook). Output: matrix of IC results
