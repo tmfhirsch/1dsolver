@@ -5,6 +5,7 @@ Singlet and triplet from Müller and Przybytek.
 Description last updates 27/07/2020
 =#
 module Potentials
+export Singlet, Triplet, Quintet
 
 using Unitful, UnitfulAtomic, Dierckx
 using Plots

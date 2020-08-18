@@ -38,7 +38,7 @@ function my_scheme(α_::α, α::α)
     S₁_,S₂_,S_,mS_,l_,ml_=α_.S₁,α_.S₂,α_.S,α_.mS,α_.l,α_.ml
     S₁, S₂, S, mS, l, ml = α.S₁, α.S₂, α.S, α.mS, α.l, α.ml
     #Δₛ₁ₛ₂ factor
-    (S₁==S₁_ && S₂==S₂_) || return false
+    (S₁==S₁_ && S₂==S₂_) || return 0
     # First, coupling term
     Ωsum=0
     for Ωₛ in max(-S,-S_):1:min(S,S_), Ω₁ in -S₁:1:S₁, Ω₂ in -S₂:1:S₂ # outer sum
@@ -47,27 +47,25 @@ function my_scheme(α_::α, α::α)
         for C in abs(S-S_):1:(S+S_) # inner sum
             Cterm = (2C+1)
             Cterm *= clebschgordan_lax(l_,0,C,0,l,0)
-            Cterm *= clebschgordan_lax(l_,ml_,C,-mS+mS_,l,ml) #TODO Changed 10/8
-            Cterm *= clebschgordan_lax(S_,mS_,C,mS-mS_,S,mS)
-            Cterm *= clebschgordan_lax(S_,Ωₛ,C,0,S,Ωₛ)
+            Cterm *= clebschgordan_lax(l_,ml_,C,mS_-mS,l,ml)
+            Cterm *= clebschgordan_lax(S,mS,C,mS_-mS,S_,mS_)
+            Cterm *= clebschgordan_lax(S,Ωₛ,C,0,S_,Ωₛ)
             Csum += Cterm
-            Cterm = 0
         end
         term = Ω₁*Ω₂
         term *= clebschgordan_lax(S₁,Ω₁,S₂,Ω₂,S_,Ωₛ)
         term *= clebschgordan_lax(S₁,Ω₁,S₂,Ω₂,S,Ωₛ)
         term *= Csum
         Ωsum += term
-        term = 0
     end
-    coupling_term=Ωsum*3/(2*S+1)*sqrt((2l_+1)/(2l+1))
+    coupling_term=Ωsum*3/(2*S_+1)*sqrt((2l_+1)/(2l+1))
     # Second, diagonal term
     if S != S_ || mS != mS_ || l != l_ || ml != ml_
         diag_term = 0
     else
         diag_term = -0.5*(S*(S+1)-S₁*(S₁+1)-S₂*(S₂+1))
     end
-    return (coupling_term + diag_term)*(-1)^(mS_-mS) #TODO changed 10/8
+    return (coupling_term + diag_term)
 end
 
 """ ⟨γ',S'|𝐓²|γ,S⟩/ħ² from (36) in Cocks et al (2019)
