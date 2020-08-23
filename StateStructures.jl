@@ -72,7 +72,7 @@ end
     Input: lmax=4
     Output: vector of a_kets
     Tested 12/08/20, I believe it is working correctly"""
-function lookup_generator(lmax)
+function a_lookup_generator(lmax)
     lookup=Vector{a_ket}()
     for S₁ in HalfInt.(1:1), i₁ in HalfInt.(0:0), S₂ in HalfInt.(1:1), i₂ in HalfInt.(0:0)
         for f₁ in abs(S₁-i₁):1:(S₁+i₁), f₂ in abs(S₂-i₂):1:(S₂+i₂)
