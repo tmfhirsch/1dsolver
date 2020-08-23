@@ -10,67 +10,6 @@ using Wigner9j, Potentials # my modules
 using Unitful, UnitfulAtomic
 using Plots
 
-""" |a⟩=|Γ,f,l,J,mJ,XS⟩ structure"""
-struct α_nos
-    S::HalfInteger
-    i::HalfInteger
-    f::HalfInteger
-end
-struct Γ_nos; α₁::α_nos; α₂::α_nos; end
-struct a_ket # symmetrised states
-    Γ::Γ_nos
-    f::HalfInteger
-    l::HalfInteger
-    J::HalfInteger
-    mJ::HalfInteger
-    XN::HalfInteger
-end
-struct a12_ket # unsymmetrised states, used to evaluate ̂Hₑₗ and ̂H_sd
-    Γ::Γ_nos
-    f::HalfInteger
-    l::HalfInteger
-    J::HalfInteger
-    mJ::HalfInteger
-end
-
-"""Generates unsymmetrised state |a₁₂⟩
-    Input: |a⟩ state containing Γ={α₁,α₂}
-    Output: related |a₁₂⟩"""
-function a12_maker(a::a_ket)
-    return a12_ket(a.Γ,a.f,a.l,a.J,a.mJ)
-end
-"""Generates unsymmetrised state |a₂₁⟩
-    Input: |a⟩ state containing Γ={α₁,α₂}
-    Output: related |a₂₁⟩"""
-function a21_maker(a::a_ket)
-    Γ=Γ_nos(a.Γ.α₂, a.Γ.α₁) # flips α₁ and α₂
-    return a12_ket(Γ,a.f,a.l,a.J,a.mJ)
-end
-
-"""Generates all |a⟩ states up to and including lmax
-    Input: lmax=4
-    Output: vector of a_kets
-    Tested 12/08/20, I believe it is working correctly"""
-function lookup_generator(lmax)
-    lookup=Vector{a_ket}()
-    for S₁ in HalfInt.(1:1), i₁ in HalfInt.(0:0), S₂ in HalfInt.(1:1), i₂ in HalfInt.(0:0)
-        for f₁ in abs(S₁-i₁):1:(S₁+i₁), f₂ in abs(S₂-i₂):1:(S₂+i₂)
-            α₁, α₂ = α_nos(S₁,i₁,f₁), α_nos(S₂,i₂,f₂)
-            Γ = Γ_nos(α₁,α₂)
-            for f in abs(f₁-f₂):1:(f₁+f₂), l in HalfInt.(0:1:lmax)
-                for J in abs(f-l):1:(f+l)
-                    for mJ in (-J):1:J
-                        @assert i₁==i₂ "i₁!=i₂, symmetrised states not suitable"
-                        XN = i₁== 0 ? 0 : 1 # bosonic or fermionic
-                        push!(lookup, a_ket(Γ,f,l,J,mJ,XN))
-                    end
-                end
-            end
-        end
-    end
-    return lookup
-end
-
 #TODO TISE solver. Input: lookup, lhs, rhs. Output: sol(R)
 """multichannel TISE solver
     Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]×[M]→[E],
@@ -242,15 +181,6 @@ function test_H_el()
     vals2 = getindex.(sol.(Rs),2); vals11 = getindex.(sol.(Rs),11)
     vals=hcat(vals1,vals10,vals2,vals11)
     plot(austrip.(Rs), austrip.(vals),title="If you see this, solver runs for H_el")
-end
-
-#TODO Spin-Dipole interaction
-"""Symmetrised states ̂H_sd
-    Input: ⟨a'|, |a⟩, R~[L]
-    Output: ⟨a'|̂H_sd|a⟩(R) ~ [E]"""
-function H_sd(bra::a_ket,ket::a_ket,R)
-    #TODO D_a12'a12 coupling factor
-    #TODO Vₚ(R) radial factor
 end
 
 

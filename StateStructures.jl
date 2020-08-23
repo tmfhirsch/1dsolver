@@ -1,6 +1,8 @@
 #= Module containing structs used to hold different states (w/ differerent
 quantum numbers), and functions to convert between them. For example, the |a⟩
 states and the |a₁₂⟩ states.=#
+module StateStructures
+
 using HalfIntegers
 
 """ |a⟩=|Γ,f,l,J,mJ,XS⟩ structure"""
@@ -13,21 +15,21 @@ struct Γ_nos; α₁::α_nos; α₂::α_nos; end
 struct a_ket # symmetrised states
     Γ::Γ_nos
     f::HalfInteger
-    l::HalfInteger
+    l::Integer
     J::HalfInteger
     mJ::HalfInteger
     XN::HalfInteger
 end
+
+
 """|a₁₂⟩ unsymmetrised version of |a⟩; used to evaluate  ̂Hₑₗ and ̂H_sd"""
 struct a12_ket
     Γ::Γ_nos
     f::HalfInteger
-    l::HalfInteger
+    l::Integer
     J::HalfInteger
     mJ::HalfInteger
 end
-
-
 """Generates unsymmetrised state |a₁₂⟩
     Input: |a⟩ state containing Γ={α₁,α₂}
     Output: related |a₁₂⟩"""
@@ -44,8 +46,8 @@ function a21_maker(a::a_ket)
 end
 
 """Given |a⟩-type states, and a function representing the interaction that
-operates on |a₁₂⟩-type states, calculates the equal and equivalent evaluation on
-those unsymmetrised states. *Assumes mass is irrelevant*
+operates on |a₁₂⟩-type states, calculates the equivalent evaluation using
+unsymmetrised states. *Assumes mass is irrelevant*
     Input: bra::|a⟩, ket::|a⟩, H_asymmetric ::|a₁₂⟩ × |a₁₂⟩ × R → [E]
     Output: ⟨bra|̂H|ket⟩, evaluated by expanding into unsymmetrised basis"""
 function asymmetric_eval(H12, bra::a_ket, ket::a_ket, R)
@@ -65,7 +67,6 @@ function asymmetric_eval(H12, bra::a_ket, ket::a_ket, R)
                            +phase_*phase*H12(a21_,a21,R)
                            )
 end
-
 
 """Generates all |a⟩ states up to and including lmax
     Input: lmax=4
@@ -95,3 +96,18 @@ function lookup_generator(lmax)
     end
     return lookup
 end
+
+################################################################################
+# |α⟩ kets
+"""|α⟩=|S₁ S₂ S mₛ⟩|l mₗ⟩ states. Used in evaluation of ̂H_sd"""
+struct α_ket
+    S₁::HalfInteger
+    S₂::HalfInteger
+    S::HalfInteger
+    mS::HalfInteger
+    l::Integer
+    ml::Integer
+end
+
+
+end #module
