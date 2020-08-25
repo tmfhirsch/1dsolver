@@ -72,7 +72,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     IC⁰ = austrip.(IC)
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
-    sol_unitless=solve(prob,Tsit5())
+    sol_unitless=solve(prob,BS5())#Tsit5())
     # add units back
     units = SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
     sol = x -> sol_unitless(austrip(x)).*units
@@ -152,7 +152,9 @@ function test_solver(lmax=0)
     n=length(lookup)
     IC=SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
     println("Starting to solve for wavefunctions, lmax=$lmax")
-    sol=solver(lookup, IC, ϵ, lhs, rhs)
+    @time begin sol=solver(lookup, IC, ϵ, lhs, rhs)
+    end
+    println("Plotting...")
     Rs=LinRange(lhs,rhs,1000);
     vals = getindex.(sol.(Rs),1)
     plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
