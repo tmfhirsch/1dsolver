@@ -48,8 +48,8 @@ end
 """Given |a⟩-type states, and a function representing the interaction that
 operates on |a₁₂⟩-type states, calculates the equivalent evaluation using
 unsymmetrised states. *Assumes mass is irrelevant*
-    Input: bra::|a⟩, ket::|a⟩, H_asymmetric ::|a₁₂⟩ × |a₁₂⟩ × R → [E]
-    Output: ⟨bra|̂H|ket⟩, evaluated by expanding into unsymmetrised basis"""
+    Input: bra::|a⟩, ket::|a⟩, ̂O12 ::|a₁₂⟩ × |a₁₂⟩ × R → [E]
+    Output: ⟨bra|̂̂̂̂O|ket⟩ evaluated by expanding into unsymmetrised basis"""
 function asymmetric_eval(H12, bra::a_ket, ket::a_ket, R)
     # 1/sqrt(2*(1+δ(α₁α₂))) prefactor
     prefac_ = bra.Γ.α₁==bra.Γ.α₂ ? 1/2 : 1/sqrt(2)
@@ -60,6 +60,14 @@ function asymmetric_eval(H12, bra::a_ket, ket::a_ket, R)
     # construct asymmetric states
     a12_, a21_ = a12_maker(bra), a21_maker(bra)
     a12,  a21  = a12_maker(ket), a21_maker(ket)
+    # R=nothing case (used to evaluate H_sd coupling coefficients)
+    if R==nothing
+        return prefac_*prefac*(H12(a12_,a12)
+                               +phase_*H12(a21_,a12)
+                               +phase*H12(a12_,a21)
+                               +phase_*phase*H12(a21_,a21)
+                               )
+    end
     # return expansion in terms of unsymmetrised states # see notebook 4 14/8/20
     return prefac_*prefac*(H12(a12_,a12,R)
                            +phase_*H12(a21_,a12,R)
