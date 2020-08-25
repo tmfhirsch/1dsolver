@@ -2,7 +2,7 @@
 quantum numbers), and functions to convert between them. For example, the |a⟩
 states and the |a₁₂⟩ states.=#
 module StateStructures
-
+export a_ket, a12_ket, a_ket, asymmetric_eval,  α_ket, a_lookup_generator
 using HalfIntegers
 
 """ |a⟩=|Γ,f,l,J,mJ,XS⟩ structure"""
