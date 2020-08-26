@@ -37,7 +37,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
             @assert dimension(IC[i,j])==dimension(1u"m") "IC[$i,$j] not a length"
         end
         for i=(n+1):2*n, j=1:size(IC)[2] # check derivative entries
-            @assert dimension(IC[i,j])==dimension(1u"m") "IC[$i,$j] not dimensionless"
+            @assert dimension(IC[i,j])==dimension(1) "IC[$i,$j] not dimensionless"
         end
     else # IC not a 1D vector or 2D array
         error("IC not 1D or 2D")
@@ -72,7 +72,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     IC⁰ = austrip.(IC)
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
-    sol_unitless=solve(prob,BS5())#Tsit5())
+    sol_unitless=solve(prob,BS5()) #BS5 used to avoid Tsit5 querying x<3a₀<lhs⁰
     # add units back
     units = SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
     sol = x -> sol_unitless(austrip(x)).*units
@@ -150,13 +150,15 @@ function test_solver(lmax=0)
     ϵ=1e-5u"hartree"
     lookup=a_lookup_generator(lmax)
     n=length(lookup)
-    IC=SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
+    # construct ICs
+    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
+                       I])
     println("Starting to solve for wavefunctions, lmax=$lmax")
     @time begin sol=solver(lookup, IC, ϵ, lhs, rhs)
     end
     println("Plotting...")
     Rs=LinRange(lhs,rhs,1000);
-    vals = getindex.(sol.(Rs),1)
+    vals = getindex.(sol.(Rs),1,1)
     plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
 end
 
