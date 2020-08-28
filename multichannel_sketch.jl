@@ -5,12 +5,9 @@ Description last updated 12/08/20=#
 using Revise
 using HalfIntegers, LinearAlgebra, StaticArrays, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
-
-push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver")
-using Interactions
-using StateStructures
 using Plots
-
+push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
+using Interactions, StateStructures
 
 """ Multichannel TISE solver. Produces info needed for K matrix.
     Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]×[M]→[E],
