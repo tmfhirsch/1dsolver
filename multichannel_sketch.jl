@@ -80,52 +80,51 @@ using SpecialFunctions, LinearAlgebra
 """ Solver for 𝐊 matrix (following Mies eqn (3.8)), where 𝐅=𝐉-𝐍𝐊.
     Inputs:
         R~[L] the asymptotic radial distance to match K at;
-        sol() solution for [𝐆; 𝐆'] where 𝐆 is matrix of wavefunctions for
+        eval = sol(R) = [𝐆; 𝐆'] where 𝐆 is matrix of wavefunctions for
     different initial conditions;
         𝐤 ~ [L]⁻¹ vector of wavenumber for each channel at rhs;
     **Note: this function assumes it is only being given open channels**
         𝐥 vector of l quantum numbers for each channel.
-    **Note: sol, 𝐤, 𝐥 must share the same ordering/number of channels**
+    **Note: eval, 𝐤, 𝐥 must share the same ordering/number of channels**
     Output:
         𝐊 ~ n×n matrix (n=number of channels considered)"""
-function K_matrix(R, sol, 𝐤, 𝐥)
+function K_matrix(R, eval, 𝐤, 𝐥)
     # match for A, B where G=J.A-N.B
     #construct G, G' matrices to match for A, B with
-    eval=sol(R)
     n=Int(size(eval,1)/2) # n = number of channels. Assumes sol in above form.
     @assert size(eval,2) == n "solution matrix not of shape 2n × n"#BUG
     G, G⁻ = austrip.(copy(eval[1:n,1:n])), copy(eval[n+1:2*n,1:n])
     # solve for A,B
     A, B = zeros(n,n), zeros(n,n) # initialise
     for i in 1:n, j in 1:n
-        # construct [jᵢ nᵢ; jᵢ' nᵢ'] matrix
+        # construct [jᵢ nᵢ; jᵢ' nᵢ'] matrix, here called [bj -bn; bj⁻ -bn⁻]
         k=𝐤[i]
         l=𝐥[i]
-        j=austrip(sqrt(k)*R)*sphericalbesselj(l,k*R)
-        j⁻=austrip(sqrt(k))*((l+1)*sphericalbesselj(l,k*R)
+        bj=austrip(sqrt(k)*R)*sphericalbesselj(l,k*R)
+        bj⁻=austrip(sqrt(k))*((l+1)*sphericalbesselj(l,k*R)
             -k*R*sphericalbesselj(l+1,k*R))
-        n=austrip(sqrt(k)*R)*sphericalbessely(l,k*R)
-        n⁻=austrip(sqrt(k))*((l+1)*sphericalbessely(l,k*R)
+        bn=austrip(sqrt(k)*R)*sphericalbessely(l,k*R)
+        bn⁻=austrip(sqrt(k))*((l+1)*sphericalbessely(l,k*R)
             -k*R*sphericalbessely(l+1,k*R))
-        Gᵢⱼ, G⁻ᵢⱼ = G[i,j], G⁻ᵢⱼ = G⁻ᵢⱼ
-        AB = [j -n; j⁻ -n⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ]
+        Gᵢⱼ, G⁻ᵢⱼ = G[i,j], G⁻[i,j]
+        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ]
         A[i,j], B[i,j] = AB
     end
     𝐊 = B*inv(A)
 end
 
-"""SKETCH: "the whole package".
+"""SKETCH: "the whole package", including
     Produces lookup, ICs, solves and outputs K matrix"""
     #TODO change this to work in |Φₐ⟩ kets instead
-function K_solver(lmax, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
+function big_fn(lmax, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     # geberate states
-    lookup=a_lookup_generator(lmax)
+    lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
     IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
                        I])
     # solver for wavefunctions
-    #TODO
+    sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
     # solve 𝐤 vector for K matrix solver
     #TODO
     # 𝐥 vector for K matrix solver
@@ -136,12 +135,11 @@ end
 # Test functions
 ################################################################################
 
-# test function for solver - runs for zero potential
-# tested successfully 12/08/2020
+# test function for solver - runs and plots first channel wavefunction
 function test_solver(lmax=0)
     lhs, rhs = 3.0u"bohr", 100u"bohr"
     ϵ=1e-5u"hartree"
-    lookup=a_lookup_generator(lmax)
+    lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
     IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
@@ -154,14 +152,37 @@ function test_solver(lmax=0)
     vals = getindex.(sol.(Rs),1,1)
     plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
 end
-#=
+
 function test_K_matrix(lmax=0)
+    println("Starting test_K_matrix")
     lhs, rhs = 3.0u"bohr", 100u"bohr"
+    μ=0.5*4.002602u"u"
     ϵ=1e-5u"hartree"
     lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
     IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
                        I])
-    # find solution
-    =#
+    # solver for wavefunctions
+    println("solving for wavefunctions")
+    sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
+    eval=sol(rhs)
+    # solve 𝐤 vector for K matrix solver
+    println("Producing k vector")
+    𝐤=fill(0.0u"bohr^-1",n)
+    for i in 1:n
+        γ = lookup[i] # channel
+        V∞ = H_rot(γ,γ,rhs,μ)
+        V∞+= H_el(γ,γ,rhs)
+        V∞+= H_sd_coeffs(γ,γ)*H_sd_radial(rhs)
+        𝐤[i] = sqrt(2*μ*(ϵ-V∞))/1u"ħ"
+    end
+    # 𝐥 vector for K matrix solver
+    println("Producing 𝐥 vector")
+    𝐥=fill(0,n)
+    for i in 1:n
+        𝐥[i]=lookup[i].l
+    end
+    println("Passing to K_matrix function")
+    K_matrix(rhs, eval, 𝐤, 𝐥)
+end
