@@ -73,9 +73,6 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     # add units back
     units = SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
     sol = x -> sol_unitless(austrip(x)).*units
-    # construct 𝐤 vector
-    𝐤=zeros(n,1)*1.0u"bohr^-1"
-
     return sol
 end
 
@@ -119,6 +116,7 @@ end
 
 """SKETCH: "the whole package".
     Produces lookup, ICs, solves and outputs K matrix"""
+    #TODO change this to work in |Φₐ⟩ kets instead
 function K_solver(lmax, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     # geberate states
     lookup=a_lookup_generator(lmax)
@@ -128,9 +126,9 @@ function K_solver(lmax, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
                        I])
     # solver for wavefunctions
     #TODO
-    # generate 𝐤 vector for K matrix solver
+    # solve 𝐤 vector for K matrix solver
     #TODO
-    # generate 𝐥 vector for K matrix solver
+    # 𝐥 vector for K matrix solver
     #TODO
 end
 
@@ -156,12 +154,14 @@ function test_solver(lmax=0)
     vals = getindex.(sol.(Rs),1,1)
     plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
 end
-
+#=
 function test_K_matrix(lmax=0)
     lhs, rhs = 3.0u"bohr", 100u"bohr"
     ϵ=1e-5u"hartree"
-    lookup=a_lookup_generator(lmax)
+    lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
     IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
                        I])
+    # find solution
+    =#
