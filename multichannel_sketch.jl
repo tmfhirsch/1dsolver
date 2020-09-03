@@ -80,20 +80,20 @@ using SpecialFunctions, LinearAlgebra
 """ Solver for 𝐊 matrix (following Mies eqn (3.8)), where 𝐅=𝐉-𝐍𝐊.
     Inputs:
         R~[L] the asymptotic radial distance to match K at;
-        eval = sol(R) = [𝐆; 𝐆'] where 𝐆 is matrix of wavefunctions for
-    different initial conditions;
+        𝐅 = [𝐆; 𝐆'] where 𝐆 is matrix of wavefunctions for
+    different initial conditions evaluated at R;
         𝐤 ~ [L]⁻¹ vector of wavenumber for each channel at rhs;
     **Note: this function assumes it is only being given open channels**
         𝐥 vector of l quantum numbers for each channel.
     **Note: eval, 𝐤, 𝐥 must share the same ordering/number of channels**
     Output:
         𝐊 ~ n×n matrix (n=number of channels considered)"""
-function K_matrix(R, eval, 𝐤, 𝐥)
+function K_matrix(R, 𝐅, 𝐤, 𝐥)
     # match for A, B where G=J.A-N.B
     #construct G, G' matrices to match for A, B with
-    n=Int(size(eval,1)/2) # n = number of channels. Assumes sol in above form.
-    @assert size(eval,2) == n "solution matrix not of shape 2n × n"
-    G, G⁻ = austrip.(copy(eval[1:n,1:n])), copy(eval[n+1:2*n,1:n])
+    n=Int(size(𝐅,1)/2) # n = number of channels. Assumes sol in above form.
+    @assert size(𝐅,2) == n "solution matrix not of shape 2n × n"
+    G, G⁻ = austrip.(copy(𝐅[1:n,1:n])), copy(𝐅[n+1:2*n,1:n])
     # solve for A,B
     A, B = zeros(n,n), zeros(n,n) # initialise
     for i in 1:n, j in 1:n
@@ -116,23 +116,60 @@ function K_matrix(R, eval, 𝐤, 𝐥)
     return 𝐊
 end
 
-"""SKETCH: "the whole package", including
-    Produces lookup, ICs, solves and outputs K matrix"""
-    #TODO change this to work in |Φₐ⟩ kets instead
-function big_fn(lmax, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
-    # geberate states
-    lookup=SmS_lookup_generator(lmax)
-    n=length(lookup)
-    # construct ICs
-    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
-                       I])
-    # solver for wavefunctions
-    sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
-    # solve 𝐤 vector for K matrix solver
-    #TODO
-    # 𝐥 vector for K matrix solver
-    #TODO
+"""Boundary condition matching via SVD
+    Inputs: AL, BCs on LHS;
+            AR, wavefunction solution to AL at matching location;
+            BL, wavefunction solution to BR at matching location;
+            BR, BCs on RHS;
+            isOpen::[Bool], vector isOpen[i]⟺"channel i is open"
+            tol_ratio=1e-10 is the ratio used to define a zero singular value
+    ***Assumes same channel ordering in AL,AR,BL,BR,isOpen***
+    Output: F, 2Nₒ×Nₒ matrix of valid (i.e. open channel) wavefunction solutions
+    evaluated at the RHS"""
+function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
+    # check on dimensions of inputs
+    @assert size(AL)==size(AR) "AL and AR have unlike dimensions"
+    @assert size(BL)==size(BR) "BL and BR have unlike dimensions"
+    @assert size(AL,1)==size(BL,1) "AL/AR and BL/BR have unlike numbers of rows"
+    @assert size(AL,1)==2*length(isOpen) "Number of rows of AL/AR/BL/BR not equal
+        to 2* number of rows of isOpen vector"
+    # numbers of channel, for reference
+    N = length(isOpen) # N channels
+    Nₒ = size(BL,2)-N # Nₒ open channels
+    # take SVD
+    x = svd(austrip.([AR -BL]), full=true) # the SVD object
+    Σ, V = x.S, x.V # extract singular values and V matrix
+    # find [C; D] where [A -B]*[C;D]=0 by extracting cols of V corresponding
+    # to singular values of zero
+    zero_cols=[] # stores indices of singular values of zero
+    zero_scale=maximum(abs.(Σ))*tol_ratio # reference scale for checking ≈0
+    for i in 1:length(Σ)
+        if isapprox(Σ[i], 0, atol=zero_scale) # singular value ≊ zero
+            push!(zero_cols, i)
+        end
+    end
+    CD = V[:,zero_cols] # σ≈0 cols of V are the cols of [C;D]
+    # sanity check for linear combinations
+    @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
+    #@assert size(CD,2)==N₀ "[C; D] doesn't have N₀ columns"
+    C = CD[1:N,:]
+    D = V[(N+1):end,:]
+    # forming F
+    F = [fill(0.0u"bohr", N, Nₒ); # initialise
+         fill(0.0, N, Nₒ)]
+    for j in 1:Nₒ # iterate over columns in D, i.e. over open channels
+        Dcol=D[:,j] # coefficients for the linear combination
+        Fcol=[zeros(N)u"bohr"; zeros(N)] # initalise wavefunction column
+        for i in 1:length(Dcol)
+            Fcol+= Dcol[i]*BR[:,i] # iᵗʰ coefficient from D * iᵗʰ BC on the RHS
+        end
+        F[:,j]=Fcol
+    end
+    # delete rows of F corresponding to closed channels
+    F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
+    return F
 end
+
 
 ################################################################################
 # Test functions
@@ -189,4 +226,39 @@ function test_K_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     𝐊=K_matrix(rhs, eval, 𝐤, 𝐥)
     𝐒=(I+im*𝐊)*inv(I-im*𝐊)
     return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
+end
+
+# unit test for F_matrix. Should produce a matrix of wavefunction solutions
+function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
+    lhs=3.0u"bohr", mid=100.0u"bohr", rhs=1000.0u"bohr")
+    println("Running test_F_matrix")
+    println("Initialising AL, BR, isOpen")
+    # arbitrary sample AL, AR
+    lookup=SmS_lookup_generator(lmax)
+    N=length(lookup)
+    # construct isOpen
+    isOpen=fill(true,N)
+    for i in 1:N
+        γ = lookup[i] # channel
+        R∞ = Inf*1u"bohr"
+        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
+        ksq = 2*μ*(ϵ-V∞)/1u"ħ^2"
+        isOpen[i] = austrip(ksq) >= 0 ? true : false # k² > 0 for open channels
+    end
+    # construct BCs
+    AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
+                       I])
+    BR = let
+        Nₒ=count(isOpen)
+        BFL = SMatrix{2*N,N}([fill(0.0u"bohr",N,N);I])
+        BFR = SMatrix{2*N,Nₒ}([Matrix(Diagonal(ones(N))[:,isOpen]u"bohr");zeros(N,Nₒ)])
+        [BFL BFR]
+    end
+    # solve for solutions
+    println("Solving for AR and BL")
+    AR = solver(lookup, AL, ϵ, lhs, mid)(mid)
+    BL = solver(lookup, BR, ϵ, rhs, mid)(mid)
+    # see if F_matrix runs
+    println("Passing to F_matrix")
+    F_matrix(AL,AR,BL,BR,isOpen)
 end
