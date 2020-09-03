@@ -55,7 +55,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
         for i=1:n, j=1:n
             V[i,j] = H_rot(lookup[i],lookup[j], x*1u"bohr", μ) # rotational
             V[i,j]+= H_el(lookup[i],lookup[j], x*1u"bohr") # electronic
-            V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
+            #V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
             #TODO hyperfine interaction
             #TODO zeeman interaction (will also need to fix channels for this)
         end
@@ -69,7 +69,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     IC⁰ = austrip.(IC)
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
-    sol_unitless=solve(prob,Tsit5())
+    sol_unitless=solve(prob,Tsit5(),reltol=1e-12)
     # add units back
     units = SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
     sol = x -> sol_unitless(austrip(x)).*units
@@ -92,12 +92,14 @@ function K_matrix(R, eval, 𝐤, 𝐥)
     # match for A, B where G=J.A-N.B
     #construct G, G' matrices to match for A, B with
     n=Int(size(eval,1)/2) # n = number of channels. Assumes sol in above form.
-    @assert size(eval,2) == n "solution matrix not of shape 2n × n"#BUG
+    @assert size(eval,2) == n "solution matrix not of shape 2n × n"
     G, G⁻ = austrip.(copy(eval[1:n,1:n])), copy(eval[n+1:2*n,1:n])
     # solve for A,B
     A, B = zeros(n,n), zeros(n,n) # initialise
     for i in 1:n, j in 1:n
         # construct [jᵢ nᵢ; jᵢ' nᵢ'] matrix, here called [bj -bn; bj⁻ -bn⁻]
+        # expressions for derivatives (⁻) calculated using Mathematica
+        # function form from Mies (A2) which ≡ Cocks et al (59)
         k=𝐤[i]
         l=𝐥[i]
         bj=austrip(sqrt(k)*R)*sphericalbesselj(l,k*R)
@@ -107,10 +109,11 @@ function K_matrix(R, eval, 𝐤, 𝐥)
         bn⁻=austrip(sqrt(k))*((l+1)*sphericalbessely(l,k*R)
             -k*R*sphericalbessely(l+1,k*R))
         Gᵢⱼ, G⁻ᵢⱼ = G[i,j], G⁻[i,j]
-        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ]
+        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], solve J;-N*AB=G;G⁻
         A[i,j], B[i,j] = AB
     end
     𝐊 = B*inv(A)
+    return 𝐊
 end
 
 """SKETCH: "the whole package", including
@@ -153,11 +156,11 @@ function test_solver(lmax=0)
     plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
 end
 
-function test_K_matrix(lmax=0)
+# unit test for K_matrix. Should produce a scattering length of 7.54 nm
+# in agreement with Przybytek
+function test_K_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
+    lhs=3.0u"bohr", rhs=1000u"bohr")
     println("Starting test_K_matrix")
-    lhs, rhs = 3.0u"bohr", 100u"bohr"
-    μ=0.5*4.002602u"u"
-    ϵ=1e-5u"hartree"
     lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
@@ -172,9 +175,8 @@ function test_K_matrix(lmax=0)
     𝐤=fill(0.0u"bohr^-1",n)
     for i in 1:n
         γ = lookup[i] # channel
-        V∞ = H_rot(γ,γ,rhs,μ)
-        V∞+= H_el(γ,γ,rhs)
-        V∞+= H_sd_coeffs(γ,γ)*H_sd_radial(rhs)
+        R∞ = Inf*1u"bohr"
+        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
         𝐤[i] = sqrt(2*μ*(ϵ-V∞))/1u"ħ"
     end
     # 𝐥 vector for K matrix solver
@@ -184,5 +186,7 @@ function test_K_matrix(lmax=0)
         𝐥[i]=lookup[i].l
     end
     println("Passing to K_matrix function")
-    K_matrix(rhs, eval, 𝐤, 𝐥)
+    𝐊=K_matrix(rhs, eval, 𝐤, 𝐥)
+    𝐒=(I+im*𝐊)*inv(I-im*𝐊)
+    return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
 end

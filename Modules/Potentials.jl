@@ -29,6 +29,9 @@ end
     Output: potential V(R) (Eₕ)
 """
 function Quintet(R)
+    if austrip(R)==Inf # check if Inf to avoid returning NaN
+        return 0.0u"hartree"
+    end
     # Fitted constants from Table III. Here, Xᵈ ≡ X' as seen in the paper
     # constants all checked cf Table III 13/07/20
     A   = 1.2378383u"hartree" # [E]
