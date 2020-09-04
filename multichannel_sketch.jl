@@ -151,23 +151,24 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     CD = V[:,zero_cols] # σ≈0 cols of V are the cols of [C;D]
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
-    #@assert size(CD,2)==N₀ "[C; D] doesn't have N₀ columns"
+    @assert size(CD,2)==Nₒ "[C; D] doesn't have Nₒ columns"
     C = CD[1:N,:]
-    D = V[(N+1):end,:]
+    D = CD[(N+1):end,:]
     # forming F
-    F = [fill(0.0u"bohr", N, Nₒ); # initialise
+    F = BR*D
+    # old code: weighting cols of BR by rows in D is just matrix multiplication
+    #=[fill(0.0u"bohr", N, Nₒ); # initialise
          fill(0.0, N, Nₒ)]
     for j in 1:Nₒ # iterate over columns in D, i.e. over open channels
         Dcol=D[:,j] # coefficients for the linear combination
         Fcol=[zeros(N)u"bohr"; zeros(N)] # initalise wavefunction column
-        for i in 1:length(Dcol)
+        for i in 1:(N+Nₒ) # iterate over N+Nₒ BCs on RHS
             Fcol+= Dcol[i]*BR[:,i] # iᵗʰ coefficient from D * iᵗʰ BC on the RHS
         end
         F[:,j]=Fcol
-    end
+    end=#
     # delete rows of F corresponding to closed channels
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
-    return F
 end
 
 
@@ -258,7 +259,41 @@ function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     println("Solving for AR and BL")
     AR = solver(lookup, AL, ϵ, lhs, mid)(mid)
     BL = solver(lookup, BR, ϵ, rhs, mid)(mid)
+    return AL,AR,BL,BR,isOpen
+    #=
     # see if F_matrix runs
     println("Passing to F_matrix")
-    F_matrix(AL,AR,BL,BR,isOpen)
+    𝐅=F_matrix(AL,AR,BL,BR,isOpen)
+    println("Finished test_F_matrix")
+    return 𝐅=#
+end
+
+# combined tests for F and K functions. Should produce a Quintet scattering
+# length of 7.54nm in agreement with Przybytek
+function test_K_and_F(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
+    lhs=3.0u"bohr", mid=100.0u"bohr", rhs=1000.0u"bohr")
+    # calculate F
+    println("Calculating F")
+    𝐅=test_F_matrix(lmax=lmax,ϵ=ϵ,μ=μ,lhs=lhs,mid=mid,rhs=rhs)
+    # calculate 𝐤 vector for K_matrix()
+    lookup=SmS_lookup_generator(lmax)
+    println("Calculating k vector")
+    n=length(lookup)
+    𝐤=fill(0.0u"bohr^-1",n)
+    for i in 1:n
+        γ = lookup[i] # channel
+        R∞ = Inf*1u"bohr"
+        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
+        𝐤[i] = sqrt(2*μ*(ϵ-V∞))/1u"ħ"
+    end
+    # 𝐥 vector for K matrix solver
+    println("Constructing l vector")
+    𝐥=fill(0,n)
+    for i in 1:n
+        𝐥[i]=lookup[i].l
+    end
+    println("Calculating K")
+    𝐊=K_matrix(rhs,𝐅,𝐤,𝐥)
+    𝐒=(I+im*𝐊)*inv(I-im*𝐊)
+    return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
 end
