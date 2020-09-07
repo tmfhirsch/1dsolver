@@ -11,9 +11,9 @@ using Interactions, StateStructures
 
 """ Multichannel TISE solver. Produces info needed for K matrix.
     Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]×[M]→[E],
-    energy~[E], lhs~[L], rhs~[L]
+    energy~[E], lhs~[L], rhs~[L]; B~[Tesla] magnetic field, μ~[m] He* mass
     Output: sol(R) [where R ∈ (lhs,rhs)] ~ IC"""
-function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
+function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     # Check units of ϵ, μ, lhs, rhs
     @assert dimension(ϵ)==dimension(1u"J") "ϵ not an energy"
     @assert dimension(μ)==dimension(1u"g") "μ not a mass"
@@ -51,13 +51,16 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
     # TISE differential equation
     function TISE(u,p,x)
         # Construct V(R) matrix
-        V = zeros(n,n)u"hartree" # initialise
+        V = zeros(ComplexF64,n,n)u"hartree" # initialise
         for i=1:n, j=1:n
             V[i,j] = H_rot(lookup[i],lookup[j], x*1u"bohr", μ) # rotational
             V[i,j]+= H_el(lookup[i],lookup[j], x*1u"bohr") # electronic
-            #V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
+            V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
+            #imaginary ionization potential
+            Γ(i,j,x) = (i==j && lookup[i].S∈[0,1]) ? 0.3*exp(-x/1.086) : 0.0
+            V[i,j]-= im*Γ(i,j,x)*1u"hartree"
             #TODO hyperfine interaction
-            #TODO zeeman interaction (will also need to fix channels for this)
+            V[i,j] += H_zee(lookup[i],lookup[j],B) # zeeman
         end
         V⁰=austrip.(V) # strip units from V
         M = (-2μ⁰/ħ⁰^2)*(ϵ⁰*I-V⁰) # double derivative matix
@@ -66,7 +69,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; μ=0.5*4.002602u"u")
         D*u # ⃗u' = D . ⃗u
     end
     # strip units from IC
-    IC⁰ = austrip.(IC)
+    IC⁰ = austrip.(complex.(IC))
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
     sol_unitless=solve(prob,Tsit5(),reltol=1e-12)
@@ -95,7 +98,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
     @assert size(𝐅,2) == n "solution matrix not of shape 2n × n"
     G, G⁻ = austrip.(copy(𝐅[1:n,1:n])), copy(𝐅[n+1:2*n,1:n])
     # solve for A,B
-    A, B = zeros(n,n), zeros(n,n) # initialise
+    A, B = zeros(ComplexF64,n,n), zeros(ComplexF64,n,n) # initialise
     for i in 1:n, j in 1:n
         # construct [jᵢ nᵢ; jᵢ' nᵢ'] matrix, here called [bj -bn; bj⁻ -bn⁻]
         # expressions for derivatives (⁻) calculated using Mathematica
@@ -141,6 +144,7 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     Σ, V = x.S, x.V # extract singular values and V matrix
     # find [C; D] where [A -B]*[C;D]=0 by extracting cols of V corresponding
     # to singular values of zero
+    #=
     zero_cols=[] # stores indices of singular values of zero
     zero_scale=maximum(abs.(Σ))*tol_ratio # reference scale for checking ≈0
     for i in 1:length(Σ)
@@ -149,6 +153,8 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
         end
     end
     CD = V[:,zero_cols] # σ≈0 cols of V are the cols of [C;D]
+    =#
+    CD = V[:,(end-Nₒ+1):end] # 4/09/20
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
     @assert size(CD,2)==Nₒ "[C; D] doesn't have Nₒ columns"
@@ -156,20 +162,9 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     D = CD[(N+1):end,:]
     # forming F
     F = BR*D
-    # old code: weighting cols of BR by rows in D is just matrix multiplication
-    #=[fill(0.0u"bohr", N, Nₒ); # initialise
-         fill(0.0, N, Nₒ)]
-    for j in 1:Nₒ # iterate over columns in D, i.e. over open channels
-        Dcol=D[:,j] # coefficients for the linear combination
-        Fcol=[zeros(N)u"bohr"; zeros(N)] # initalise wavefunction column
-        for i in 1:(N+Nₒ) # iterate over N+Nₒ BCs on RHS
-            Fcol+= Dcol[i]*BR[:,i] # iᵗʰ coefficient from D * iᵗʰ BC on the RHS
-        end
-        F[:,j]=Fcol
-    end=#
-    # delete rows of F corresponding to closed channels
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
 end
+
 
 
 ################################################################################
@@ -196,7 +191,7 @@ end
 
 # unit test for K_matrix. Should produce a scattering length of 7.54 nm
 # in agreement with Przybytek
-function test_K_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
+function test_K_matrix(;lmax=0, ϵ=1e-9u"hartree", μ=0.5*4.002602u"u",
     lhs=3.0u"bohr", rhs=1000u"bohr")
     println("Starting test_K_matrix")
     lookup=SmS_lookup_generator(lmax)
@@ -226,7 +221,8 @@ function test_K_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     println("Passing to K_matrix function")
     𝐊=K_matrix(rhs, eval, 𝐤, 𝐥)
     𝐒=(I+im*𝐊)*inv(I-im*𝐊)
-    return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
+    #return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
+    return 𝐒
 end
 
 # unit test for F_matrix. Should produce a matrix of wavefunction solutions
@@ -259,13 +255,14 @@ function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     println("Solving for AR and BL")
     AR = solver(lookup, AL, ϵ, lhs, mid)(mid)
     BL = solver(lookup, BR, ϵ, rhs, mid)(mid)
-    return AL,AR,BL,BR,isOpen
-    #=
+    #=#Bug fixing 4/09 normlaisation
+    AR = AR./maximum(abs.(austrip.(AR)),dims=1)
+    BL = BL./maximum(abs.(austrip.(BL)),dims=1)=#
     # see if F_matrix runs
     println("Passing to F_matrix")
     𝐅=F_matrix(AL,AR,BL,BR,isOpen)
     println("Finished test_F_matrix")
-    return 𝐅=#
+    return 𝐅
 end
 
 # combined tests for F and K functions. Should produce a Quintet scattering
