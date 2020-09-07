@@ -154,7 +154,7 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     end
     CD = V[:,zero_cols] # σ≈0 cols of V are the cols of [C;D]
     =#
-    CD = V[:,(end-Nₒ+1):end] # 4/09/20
+    CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
     @assert size(CD,2)==Nₒ "[C; D] doesn't have Nₒ columns"
@@ -172,7 +172,7 @@ end
 ################################################################################
 
 # test function for solver - runs and plots first channel wavefunction
-function test_solver(lmax=0)
+function test_solver(;lmax=0,B=0u"T")
     lhs, rhs = 3.0u"bohr", 100u"bohr"
     ϵ=1e-5u"hartree"
     lookup=SmS_lookup_generator(lmax)
@@ -181,12 +181,12 @@ function test_solver(lmax=0)
     IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
                        I])
     println("Starting to solve for wavefunctions, lmax=$lmax")
-    @time begin sol=solver(lookup, IC, ϵ, lhs, rhs)
+    @time begin sol=solver(lookup, IC, ϵ, lhs, rhs,B=B)
     end
     println("Plotting...")
-    Rs=LinRange(lhs,rhs,1000);
-    vals = getindex.(sol.(Rs),1,1)
-    plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of first channel", legend=false)
+    Rs=LinRange(lhs,rhs,1000)
+    vals = getindex.(sol.(Rs),n,n)
+    plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of last channel", legend=false)
 end
 
 # unit test for K_matrix. Should produce a scattering length of 7.54 nm
