@@ -1,11 +1,15 @@
 #= Multichannel equations solver. Uses symmetrised |a⟩ basis states and all
 of the interactions except for the Zeeman interaction.
 All states up to and including the lmax parameter are used
-Description last updated 12/08/20=#
-using Revise
+F matrix matches boundary conditions, K matrix matches to bessel functions
+σ_matrix uses the other functions to produce cross sections from high-level inpt
+Description last updated 9/09/20=#
+
+module CrossSections
+export σ_matrix
+
 using HalfIntegers, LinearAlgebra, StaticArrays, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
-using Plots
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Interactions, StateStructures
 
@@ -79,7 +83,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     return sol
 end
 
-using SpecialFunctions, LinearAlgebra
+using SpecialFunctions
 """ Solver for 𝐊 matrix (following Mies eqn (3.8)), where 𝐅=𝐉-𝐍𝐊.
     Inputs:
         R~[L] the asymptotic radial distance to match K at;
@@ -142,18 +146,6 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     # take SVD
     x = svd(austrip.([AR -BL]), full=true) # the SVD object
     Σ, V = x.S, x.V # extract singular values and V matrix
-    # find [C; D] where [A -B]*[C;D]=0 by extracting cols of V corresponding
-    # to singular values of zero
-    #=
-    zero_cols=[] # stores indices of singular values of zero
-    zero_scale=maximum(abs.(Σ))*tol_ratio # reference scale for checking ≈0
-    for i in 1:length(Σ)
-        if isapprox(Σ[i], 0, atol=zero_scale) # singular value ≊ zero
-            push!(zero_cols, i)
-        end
-    end
-    CD = V[:,zero_cols] # σ≈0 cols of V are the cols of [C;D]
-    =#
     CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
@@ -249,132 +241,4 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
      return σ_output(𝛔,γ_lookup,ϵ,B,lmax)
 end
 
-
-################################################################################
-# Test functions
-################################################################################
-
-# test function for solver - runs and plots first channel wavefunction
-function test_solver(;lmax=0,B=0u"T")
-    lhs, rhs = 3.0u"bohr", 100u"bohr"
-    ϵ=1e-5u"hartree"
-    lookup=SmS_lookup_generator(lmax)
-    n=length(lookup)
-    # construct ICs
-    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
-                       I])
-    println("Starting to solve for wavefunctions, lmax=$lmax")
-    @time begin sol=solver(lookup, IC, ϵ, lhs, rhs,B=B)
-    end
-    println("Plotting...")
-    Rs=LinRange(lhs,rhs,1000)
-    vals = getindex.(sol.(Rs),n,n)
-    plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of last channel", legend=false)
-end
-
-# unit test for K_matrix. Should produce a scattering length of 7.54 nm
-# in agreement with Przybytek
-function test_K_matrix(;lmax=0, ϵ=1e-9u"hartree", μ=0.5*4.002602u"u",
-    lhs=3.0u"bohr", rhs=1000u"bohr")
-    println("Starting test_K_matrix")
-    lookup=SmS_lookup_generator(lmax)
-    n=length(lookup)
-    # construct ICs
-    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
-                       I])
-    # solver for wavefunctions
-    println("solving for wavefunctions")
-    sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
-    eval=sol(rhs)
-    # solve 𝐤 vector for K matrix solver
-    # ***Warning: the following code assumes all channels are open***
-    println("Producing k vector")
-    𝐤=fill(0.0u"bohr^-1",n)
-    for i in 1:n
-        γ = lookup[i] # channel
-        R∞ = Inf*1u"bohr"
-        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
-        𝐤[i] = sqrt(2*μ*(ϵ-V∞))/1u"ħ"
-    end
-    # 𝐥 vector for K matrix solver
-    println("Producing 𝐥 vector")
-    𝐥=fill(0,n)
-    for i in 1:n
-        𝐥[i]=lookup[i].l
-    end
-    println("Passing to K_matrix function")
-    𝐊=K_matrix(rhs, eval, 𝐤, 𝐥)
-    𝐒=(I+im*𝐊)*inv(I-im*𝐊)
-    #return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
-    return 𝐒
-end
-
-# unit test for F_matrix. Should produce a matrix of wavefunction solutions
-function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
-    lhs=3.0u"bohr", mid=100.0u"bohr", rhs=1000.0u"bohr")
-    println("Running test_F_matrix")
-    println("Initialising AL, BR, isOpen")
-    # arbitrary sample AL, AR
-    lookup=SmS_lookup_generator(lmax)
-    N=length(lookup)
-    # construct isOpen
-    isOpen=fill(true,N)
-    for i in 1:N
-        γ = lookup[i] # channel
-        R∞ = Inf*1u"bohr"
-        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
-        ksq = 2*μ*(ϵ-V∞)/1u"ħ^2"
-        isOpen[i] = austrip(ksq) >= 0 ? true : false # k² > 0 for open channels
-    end
-    # construct BCs
-    AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
-                       I])
-    BR = let
-        Nₒ=count(isOpen)
-        BFL = SMatrix{2*N,N}([fill(0.0u"bohr",N,N);I])
-        BFR = SMatrix{2*N,Nₒ}([Matrix(Diagonal(ones(N))[:,isOpen]u"bohr");zeros(N,Nₒ)])
-        [BFL BFR]
-    end
-    # solve for solutions
-    println("Solving for AR and BL")
-    AR = solver(lookup, AL, ϵ, lhs, mid)(mid)
-    BL = solver(lookup, BR, ϵ, rhs, mid)(mid)
-    #=#Bug fixing 4/09 normlaisation
-    AR = AR./maximum(abs.(austrip.(AR)),dims=1)
-    BL = BL./maximum(abs.(austrip.(BL)),dims=1)=#
-    # see if F_matrix runs
-    println("Passing to F_matrix")
-    𝐅=F_matrix(AL,AR,BL,BR,isOpen)
-    println("Finished test_F_matrix")
-    return 𝐅
-end
-
-# combined tests for F and K functions. Should produce a Quintet scattering
-# length of 7.54nm in agreement with Przybytek
-function test_K_and_F(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
-    lhs=3.0u"bohr", mid=100.0u"bohr", rhs=1000.0u"bohr")
-    # calculate F
-    println("Calculating F")
-    𝐅=test_F_matrix(lmax=lmax,ϵ=ϵ,μ=μ,lhs=lhs,mid=mid,rhs=rhs)
-    # calculate 𝐤 vector for K_matrix()
-    lookup=SmS_lookup_generator(lmax)
-    println("Calculating k vector")
-    n=length(lookup)
-    𝐤=fill(0.0u"bohr^-1",n)
-    for i in 1:n
-        γ = lookup[i] # channel
-        R∞ = Inf*1u"bohr"
-        V∞ = H_el(γ,γ,R∞) + H_sd_coeffs(γ,γ)*H_sd_radial(R∞) + H_rot(γ,γ,R∞,μ)
-        𝐤[i] = sqrt(2*μ*(ϵ-V∞))/1u"ħ"
-    end
-    # 𝐥 vector for K matrix solver
-    println("Constructing l vector")
-    𝐥=fill(0,n)
-    for i in 1:n
-        𝐥[i]=lookup[i].l
-    end
-    println("Calculating K")
-    𝐊=K_matrix(rhs,𝐅,𝐤,𝐥)
-    𝐒=(I+im*𝐊)*inv(I-im*𝐊)
-    return uconvert(u"nm", sqrt(pi*abs(1-𝐒[n,n])^2/𝐤[n]^2/(4*pi)))
-end
+end # module
