@@ -165,6 +165,89 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
 end
 
+# structure for holding cross sections and the inputs that produced them
+struct σ_output
+    σ # the matrix of cross sections
+    γ_lookup :: Array{γ_ket,1}
+    ϵ :: Unitful.Energy # energy input
+    B :: Unitful.BField # B field strength input
+    lmax :: Int # lmax input
+end
+
+""" Calculates matrix of cross sections between γ, only summing over l and mₗ
+    Input: ϵ~[E], B~[Tesla], lmax
+    Output: σ_output containing: σ where σ[i,j]=σ(γ_lookup[j]→γ_lookup[i]),
+    γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
+function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
+    lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=100.0u"bohr",
+    rhs::Unitful.Length=1000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
+    # lookup vector of |SmS⟩ states to be considered
+    lookup=SmS_lookup_generator(lmax)
+    N=length(lookup)
+    # construct isOpen. simultaneously construct 𝐤 and 𝐥 for K calculation
+    isOpen=fill(true,N)
+    𝐤Open=Array{typeof(1.0u"bohr^-1")}([])
+    𝐥Open=Array{Int,1}([])
+    for i in 1:N
+        ϕ = lookup[i] # channel
+        R∞ = Inf*1u"bohr"
+        V∞ = H_el(ϕ,ϕ,R∞) + H_sd_coeffs(ϕ,ϕ)*H_sd_radial(R∞) + H_rot(ϕ,ϕ,R∞,μ) + H_zee(ϕ,ϕ,B)
+        ksq = 2*μ*(ϵ-V∞)/1u"ħ^2"
+        if austrip(ksq) >= 0
+            isOpen[i] = true
+            push!(𝐤Open,uconvert(u"bohr^-1",sqrt(ksq)))
+            push!(𝐥Open,ϕ.l)
+        else # ksq < 0 ⟺ closed channel
+            isOpen[i] = false
+        end
+    end
+    Nₒ=count(isOpen); Nₒ==0 && return("No open channels!")
+    @assert length(findall(isOpen))==length(𝐤Open)==Nₒ "number of
+    open channels disagrees between isOpen, 𝐤Open and 𝐥Open" # sanity check
+    # construct BCs
+    AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
+                       I])
+    BR = let
+        Nₒ=count(isOpen)
+        BFL = SMatrix{2*N,N}([fill(0.0u"bohr",N,N);I])
+        BFR = SMatrix{2*N,Nₒ}([Matrix(Diagonal(ones(N))[:,isOpen]u"bohr");zeros(N,Nₒ)])
+        [BFL BFR]
+    end
+    # solve for inividual BCs
+    AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid)
+    BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
+    # find wavefunction satisfying both BCs only including open channels
+    𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
+    # match to bessel functions to find K matrix
+    𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open)
+    @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
+    𝐒 = (I+im*𝐊)*inv(I-im*𝐊) # Scattering matrix
+    𝐓 = I-𝐒 # transition matrix
+    𝐓sq= abs2.(𝐓) # |Tᵢⱼ|² for use in calculating cross sections
+    # initialise γ states used for cross sections
+    γ_lookup=unique(γ_ket_convert.(lookup[isOpen]))
+    nᵧ=length(γ_lookup)
+    # create k²ᵧ vector used to calculate cross sections
+    𝐤²ᵧ=let
+        k²(γ::γ_ket)=uconvert(u"bohr^-2",2*μ*(ϵ-H_zee(γ,γ,B))/1u"ħ^2") # only Zeeman at R=∞
+        k².(γ_lookup)
+    end
+    # initialise σ array
+    𝛔=zeros(nᵧ,nᵧ)u"bohr^2"
+    # fill in entries σᵢⱼ. row i = output = γ_, column j = input = γ
+    for i in 1:nᵧ, j in 1:nᵧ
+        γ_, γ = γ_lookup[i], γ_lookup[j]
+        prefac = π/𝐤²ᵧ[j] # k²ᵧ from incoming state
+        sum = 0 #initialise sum
+        for m in 1:Nₒ, n in 1:Nₒ # row m output, col n input
+             γ_ket_convert(lookup[isOpen][m])==γ_ || continue # output states match
+             γ_ket_convert(lookup[isOpen][n])==γ || continue # input states match
+             sum += 𝐓sq[m,n]
+         end
+         𝛔[i,j]=prefac*sum
+     end
+     return σ_output(𝛔,γ_lookup,ϵ,B,lmax)
+end
 
 
 ################################################################################
@@ -204,6 +287,7 @@ function test_K_matrix(;lmax=0, ϵ=1e-9u"hartree", μ=0.5*4.002602u"u",
     sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
     eval=sol(rhs)
     # solve 𝐤 vector for K matrix solver
+    # ***Warning: the following code assumes all channels are open***
     println("Producing k vector")
     𝐤=fill(0.0u"bohr^-1",n)
     for i in 1:n
