@@ -82,7 +82,7 @@ function a12_maker(a::a_ket)
     return a12_ket(a.Γ,a.f,a.l,a.J,a.mJ)
 end
 """Generates related unsymmetrised state |a₂₁⟩. Does NOT do the proper equality
-with phase factors.
+    with phase factors.
     Input: |a⟩ state containing Γ={α₁,α₂}
     Output: related |a₂₁⟩"""
 function a21_maker(a::a_ket)
@@ -91,8 +91,8 @@ function a21_maker(a::a_ket)
 end
 
 """Given |a⟩-type states, and a function representing the interaction that
-operates on |a₁₂⟩-type states, calculates the equivalent evaluation using
-unsymmetrised states. *Assumes mass is irrelevant*
+    operates on |a₁₂⟩-type states, calculates the equivalent evaluation using
+    unsymmetrised states. *Assumes mass is irrelevant*
     Input: bra::|a⟩, ket::|a⟩, ̂O12 ::|a₁₂⟩ × |a₁₂⟩ × R → [E]
     Output: ⟨bra|̂̂̂̂O|ket⟩ evaluated by expanding into unsymmetrised basis"""
 function asymmetric_eval(H12, bra::a_ket, ket::a_ket, R)

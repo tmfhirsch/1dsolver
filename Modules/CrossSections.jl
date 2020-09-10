@@ -54,15 +54,16 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     end
     # TISE differential equation
     function TISE(u,p,x)
+        @info x, maximum(abs.(u))
         # Construct V(R) matrix
         V = zeros(ComplexF64,n,n)u"hartree" # initialise
         for i=1:n, j=1:n
             V[i,j] = H_rot(lookup[i],lookup[j], x*1u"bohr", μ) # rotational
             V[i,j]+= H_el(lookup[i],lookup[j], x*1u"bohr") # electronic
             V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
-            #imaginary ionization potential
+            #imaginary ionization potential width from Garrison et al 1973
             Γ(i,j,x) = (i==j && lookup[i].S∈[0,1]) ? 0.3*exp(-x/1.086) : 0.0
-            V[i,j]-= im*Γ(i,j,x)*1u"hartree"
+            V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019)
             #TODO hyperfine interaction
             V[i,j] += H_zee(lookup[i],lookup[j],B) # zeeman
         end
@@ -173,6 +174,7 @@ end
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=100.0u"bohr",
     rhs::Unitful.Length=1000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
+    @info "starting"
     # lookup vector of |SmS⟩ states to be considered
     lookup=SmS_lookup_generator(lmax)
     N=length(lookup)
@@ -197,6 +199,7 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     @assert length(findall(isOpen))==length(𝐤Open)==Nₒ "number of
     open channels disagrees between isOpen, 𝐤Open and 𝐥Open" # sanity check
     # construct BCs
+    @info "constructing BCs"
     AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
                        I])
     BR = let
@@ -206,17 +209,21 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
         [BFL BFR]
     end
     # solve for inividual BCs
+    @info "solving for AR, BL"
     AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid)
     BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
     # find wavefunction satisfying both BCs only including open channels
+    @info "solving for F"
     𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
     # match to bessel functions to find K matrix
+    @info "solving for K"
     𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open)
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
     𝐒 = (I+im*𝐊)*inv(I-im*𝐊) # Scattering matrix
     𝐓 = I-𝐒 # transition matrix
     𝐓sq= abs2.(𝐓) # |Tᵢⱼ|² for use in calculating cross sections
     # initialise γ states used for cross sections
+    @info "producing γ states"
     γ_lookup=unique(γ_ket_convert.(lookup[isOpen]))
     nᵧ=length(γ_lookup)
     # create k²ᵧ vector used to calculate cross sections
@@ -225,6 +232,7 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
         k².(γ_lookup)
     end
     # initialise σ array
+    @info "constructing σ array"
     𝛔=zeros(nᵧ,nᵧ)u"bohr^2"
     # fill in entries σᵢⱼ. row i = output = γ_, column j = input = γ
     for i in 1:nᵧ, j in 1:nᵧ

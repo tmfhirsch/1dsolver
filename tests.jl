@@ -1,4 +1,4 @@
-# Unit tests
+# Unit tests. Tested 9/9/20
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Revise
 using CrossSections: solver, K_matrix, F_matrix, σ_matrix
@@ -90,14 +90,11 @@ function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     println("Solving for AR and BL")
     AR = solver(lookup, AL, ϵ, lhs, mid)(mid)
     BL = solver(lookup, BR, ϵ, rhs, mid)(mid)
-    #=#Bug fixing 4/09 normlaisation
-    AR = AR./maximum(abs.(austrip.(AR)),dims=1)
-    BL = BL./maximum(abs.(austrip.(BL)),dims=1)=#
     # see if F_matrix runs
     println("Passing to F_matrix")
     𝐅=F_matrix(AL,AR,BL,BR,isOpen)
     println("Finished test_F_matrix")
-    return 𝐅
+    𝐅
 end
 
 # combined tests for F and K functions. Should produce a Quintet scattering
