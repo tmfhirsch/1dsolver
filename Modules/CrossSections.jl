@@ -13,7 +13,7 @@ using Unitful, UnitfulAtomic
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Interactions, StateStructures
 
-""" Multichannel TISE solver. Produces info needed for K matrix.
+""" Multichannel TISE solver.
     Input: lookup vector, IC~SA{{[L],...,1,...}}, pot~|a⟩×|a⟩×[L]×[M]→[E],
     energy~[E], lhs~[L], rhs~[L]; B~[Tesla] magnetic field, μ~[m] He* mass
     Output: sol(R) [where R ∈ (lhs,rhs)] ~ IC"""
