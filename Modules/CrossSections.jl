@@ -8,7 +8,7 @@ Description last updated 9/09/20=#
 module CrossSections
 export σ_matrix
 
-using HalfIntegers, LinearAlgebra, StaticArrays, OrdinaryDiffEq, WignerSymbols
+using HalfIntegers, LinearAlgebra, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Interactions, StateStructures
@@ -54,7 +54,6 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     end
     # TISE differential equation
     function TISE(u,p,x)
-        @info x, maximum(abs.(u))
         # Construct V(R) matrix
         V = zeros(ComplexF64,n,n)u"hartree" # initialise
         for i=1:n, j=1:n
@@ -69,17 +68,17 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
         end
         V⁰=austrip.(V) # strip units from V
         M = (-2μ⁰/ħ⁰^2)*(ϵ⁰*I-V⁰) # double derivative matix
-        D = SMatrix{2*n,2*n}([0*I I
-                              M 0*I])
+        D = ([0*I I
+              M 0*I])
         D*u # ⃗u' = D . ⃗u
     end
     # strip units from IC
     IC⁰ = austrip.(complex.(IC))
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
-    sol_unitless=solve(prob,Tsit5(),reltol=1e-12)
+    sol_unitless=solve(prob,Tsit5(),reltol=1e-10,saveat=[rhs⁰])
     # add units back
-    units = SVector{2*n}(vcat(fill(1.0u"bohr",n),fill(1.0,n)))
+    units = vcat(fill(1.0u"bohr",n),fill(1.0,n))
     sol = x -> sol_unitless(austrip(x)).*units
     return sol
 end
@@ -200,12 +199,11 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     open channels disagrees between isOpen, 𝐤Open and 𝐥Open" # sanity check
     # construct BCs
     @info "constructing BCs"
-    AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
-                       I])
+    AL=[fill(0.0u"bohr",N,N); I]
     BR = let
         Nₒ=count(isOpen)
-        BFL = SMatrix{2*N,N}([fill(0.0u"bohr",N,N);I])
-        BFR = SMatrix{2*N,Nₒ}([Matrix(Diagonal(ones(N))[:,isOpen]u"bohr");zeros(N,Nₒ)])
+        BFL = [fill(0.0u"bohr",N,N); I]
+        BFR = [Matrix(Diagonal(ones(N))[:,isOpen]u"bohr"); zeros(N,Nₒ)]
         [BFL BFR]
     end
     # solve for inividual BCs

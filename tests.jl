@@ -3,7 +3,7 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Revise
 using CrossSections: solver, K_matrix, F_matrix, σ_matrix
 using StateStructures, Interactions
-using Unitful, UnitfulAtomic, LinearAlgebra, StaticArrays
+using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 
 # test function for solver - runs and plots first channel wavefunction
@@ -13,15 +13,10 @@ function test_solver(;lmax=0,B=0u"T")
     lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
-    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
-                       I])
+    IC=[fill(0.0u"bohr",n,n); I]
     println("Starting to solve for wavefunctions, lmax=$lmax")
-    @time begin sol=solver(lookup, IC, ϵ, lhs, rhs,B=B)
-    end
-    println("Plotting...")
-    Rs=LinRange(lhs,rhs,1000)
-    vals = getindex.(sol.(Rs),n,n)
-    plot(austrip.(Rs), austrip.(vals),title="It works! Plotting wavefn of last channel", legend=false)
+    sol=solver(lookup, IC, ϵ, lhs, rhs,B=B)
+    println("Solved!")
 end
 
 # unit test for K_matrix. Should produce a scattering length of 7.54 nm
@@ -32,10 +27,9 @@ function test_K_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
     lookup=SmS_lookup_generator(lmax)
     n=length(lookup)
     # construct ICs
-    IC=SMatrix{2*n,n}([fill(0.0u"bohr",n,n)
-                       I])
+    IC=[fill(0.0u"bohr",n,n); I]
     # solver for wavefunctions
-    println("solving for wavefunctions")
+    println("Solving for wavefunctions")
     sol=solver(lookup,IC,ϵ,lhs,rhs,μ=μ)
     eval=sol(rhs)
     # solve 𝐤 vector for K matrix solver
@@ -78,12 +72,11 @@ function test_F_matrix(;lmax=0, ϵ=1e-12u"hartree", μ=0.5*4.002602u"u",
         isOpen[i] = austrip(ksq) >= 0 ? true : false # k² > 0 for open channels
     end
     # construct BCs
-    AL=SMatrix{2*N,N}([fill(0.0u"bohr",N,N)
-                       I])
+    AL=[fill(0.0u"bohr",N,N); I]
     BR = let
         Nₒ=count(isOpen)
-        BFL = SMatrix{2*N,N}([fill(0.0u"bohr",N,N);I])
-        BFR = SMatrix{2*N,Nₒ}([Matrix(Diagonal(ones(N))[:,isOpen]u"bohr");zeros(N,Nₒ)])
+        BFL = [fill(0.0u"bohr",N,N); I]
+        BFR = [Matrix(Diagonal(ones(N))[:,isOpen]u"bohr"); zeros(N,Nₒ)]
         [BFL BFR]
     end
     # solve for solutions

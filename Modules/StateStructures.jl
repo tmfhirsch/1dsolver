@@ -60,7 +60,7 @@ struct a_Γ_nos; α₁::α_nos; α₂::α_nos; end
 struct a_ket # symmetrised states
     Γ::a_Γ_nos
     f::HalfInteger
-    l::Integer
+    l::Int
     J::HalfInteger
     mJ::HalfInteger
     XN::HalfInteger
@@ -71,7 +71,7 @@ end
 struct a12_ket
     Γ::a_Γ_nos
     f::HalfInteger
-    l::Integer
+    l::Int
     J::HalfInteger
     mJ::HalfInteger
 end
