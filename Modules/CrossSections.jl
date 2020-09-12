@@ -6,7 +6,7 @@ F matrix matches boundary conditions, K matrix matches to bessel functions
 Description last updated 9/09/20=#
 
 module CrossSections
-export σ_matrix
+export σ_output, σ_matrix
 
 using HalfIntegers, LinearAlgebra, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
@@ -173,7 +173,7 @@ end
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=100.0u"bohr",
     rhs::Unitful.Length=1000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
-    @info "starting"
+    @info "Starting σ_matrix"
     # lookup vector of |SmS⟩ states to be considered
     lookup=SmS_lookup_generator(lmax)
     N=length(lookup)
