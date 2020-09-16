@@ -147,7 +147,7 @@ function a_lookup_generator(lmax)
             end
         end
     end
-    return lookup
+    lookup
 end
 
 end # module

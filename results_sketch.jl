@@ -4,52 +4,119 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using CrossSections, StateStructures, Interactions
 using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
-
-
 using BSON, Dates
 
-# saves pairwise cross section data. STRIPS UNITS FROM FILENAME, ASSUMES
-# E in Eh and B field in Tesla
-function save_pairwiseCS(data::σ_output)
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\15-9-20-tests\h-SmS-PairwiseCS"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\15-9-20-tests\h-gam-PairwiseCS"
+
+# saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
+function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
-    cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\PairwiseCS")
+    cd(SmSpwcs_dir)
     date_str=string(Dates.today())
-    params_str="_E"*string(ustrip(data.ϵ))*"_B"*string(ustrip(data.B))*"_lmax"*string(data.lmax)
-    save_str=date_str*params_str*".pairwiseCS"
-    bson(save_str, σ=data.σ, γ_lookup=data.γ_lookup, ϵ=data.ϵ, B=data.B, lmax=data.lmax)
+    params_str="_E"*string(ustrip(uconvert(u"hartree",data.ϵ)))*"_B"*
+    string(ustrip(uconvert(u"T",data.B)))*"_lmax"*string(data.lmax)
+    save_str=date_str*params_str*".SmSpwcs"
+    bson(save_str, σ=data.σ, lookup=data.lookup, ϵ=data.ϵ, B=data.B, lmax=data.lmax)
     cd(wd)
 end
 
 #checks that save_pairwiseCS runs for 1e-12 Eh, 0.01T, lmax=0
-function test_save_pairwiseCS()
+function test_save_SmSpwcs()
     output=σ_matrix(1e-12u"hartree",0.01u"T",0)
-    save_pairwiseCS(output)
+    save_SmSpwcs(output)
 end
 
-""" generate pairwiseCS for different energies (in Eh), logarithmically spaced
+""" generate and save .SmSpwcs for different energies (in Eh), logarithmically spaced
     Inputs: log₁₀(austrip(Emin)), log₁₀(austrip(Emax)), n = number of different energies, lmax;
     B=0T magnetic field strength
     Outputs: / (saves files using save_pairwiseCS)"""
-function diff_E_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T")
+function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T")
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
+    println("lmax=$lmax. Generating σ_output for E/Eh= ")
     for E in Es
+        println("$(austrip(E)), ")
         output=σ_matrix(E,B,lmax)
-        save_pairwiseCS(output)
+        save_SmSpwcs(output)
     end
 end
 
-""" loads pairwiseCS datas with filenames that fit
-    Inputs: Emin/max ~[E], Bmin/max ~ [Tesla], lmax
-    Output: array of σ_outputs found from filename filtering"""
-function load_pairwiseCS(Emin::Unitful.Energy,Emax::Unitful.Energy,
+# loads, then resaves all files in pairwiseCSfunction; for changing name schemes
+function SmSpwcs_resaver()
+    wd=pwd()
+    cd(SmSpwcs_dir)
+    for f in readdir()
+        load=BSON.load(f)
+        data=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+        #rm(f) # delete old file
+        save_SmSpwcs(data) # save new file
+    end
+    cd(wd)
+end
+
+#################################.gampwcs functions#############################
+# saves γ_output as a .gampwcs file in ./gampwcs_dir/, E in Eh and B in T
+function save_gampwcs(data::γ_output)
+    wd=pwd()
+    cd(gampwcs_dir)
+    date_str=string(Dates.today())
+    params_str="_E"*string(ustrip(uconvert(u"hartree",data.ϵ)))*"_B"*
+    string(ustrip(uconvert(u"T",data.B)))*"_lmax"*string(data.lmax)
+    save_str=date_str*params_str*".gampwcs"
+    bson(save_str, σ=data.σ, lookup=data.γ_lookup, ϵ=data.ϵ, B=data.B, lmax=data.lmax)
+    cd(wd)
+end
+
+#checks that save_pairwiseCS runs for 1e-12 Eh, 0.01T, lmax=0
+function test_save_gampwcs(;ϵ=1e-11u"hartree",B=0.01u"T",lmax=0)
+    output=σ2γ_output(σ_matrix(ϵ,B,lmax))
+    save_gampwcs(output)
+end
+
+""" loads .SmSpwcs file/s, converts to γ_output and saves as .gampwcs file
+    Input: target::String, complete filename of target file in /SmS-PairwiseCS.
+    If an exact match is given to a target file, converts just that file.
+    Otherwise, converts all filenames where occursin(target, filename).
+        This function defaults to matching/converting every file"""
+function σ2γ_data(target="")
+    wd=pwd()
+    cd(SmSpwcs_dir)
+    for f in readdir() # first check for exact matches; break at first match
+        if target==f
+            load=BSON.load(f)
+            SmSdata=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+            gamdata=σ2γ_output(SmSdata)
+            save_gampwcs(gamdata)
+            return
+        end
+    end
+    for f in readdir() # no exact match found; converting all applicable files
+        if occursin(target,f)
+            load=BSON.load(f)
+            SmSdata=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+            gamdata=σ2γ_output(SmSdata)
+            save_gampwcs(gamdata)
+        end
+    end
+    cd(wd)
+end
+
+###################################Load data####################################
+""" load .SmSpwcs data with filenames fitting bounds on E, B, lmax
+    Inputs: flag∈{"SmS","gam"}, Emin/max ~[E], Bmin/max ~ [Tesla], lmax
+    Output: array of outputs found from filename filtering"""
+function load_data(flag::String,Emin::Unitful.Energy,Emax::Unitful.Energy,
     Bmin::Unitful.BField,Bmax::Unitful.BField,lmax::Integer)
+    @assert flag in ["SmS","gam"] "flag is neither 'SmS' or 'gam'"
     # directory change
     wd=pwd() # current working directory
-    cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\PairwiseCS")
+    dir = flag=="SmS" ? SmSpwcs_dir : gampwcs_dir
+    cd(dir)
     # initialise output
     output=[]
+    filetype = flag=="SmS" ? ".SmSpwcs" : ".gampwcs"
     for f in readdir()
-        occursin("pairwiseCS",f) || continue
+        occursin(filetype,f) || continue
         fE=let
             SIndex=findfirst(isequal('E'),f)+1
             EIndex=findall(isequal('_'),f)[2]-1
@@ -70,7 +137,11 @@ function load_pairwiseCS(Emin::Unitful.Energy,Emax::Unitful.Energy,
         (Emin<=fE<=Emax)&&(Bmin<=fB<=Bmax)&&(flmax==lmax) || continue
         # within parameters, loading:
         load=BSON.load(f)
-        data=σ_output(load[:σ],load[:γ_lookup],load[:ϵ],load[:B],load[:lmax])
+        if flag=="SmS"
+            data=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+        else
+            data=γ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+        end
         push!(output,data)
     end
     cd(wd)
@@ -78,35 +149,32 @@ function load_pairwiseCS(Emin::Unitful.Energy,Emax::Unitful.Energy,
 end
 
 # test if load_pairwiseCS runs
-test_load_pairwiseCS()=load_pairwiseCS(1e-12u"hartree",1e-8u"hartree",0.0u"T",1.0u"T",0)
+test_load_SmSpwcs()=load_data("SmS",1e-12u"hartree",1e-8u"hartree",0.0u"T",1.0u"T",0)
+test_load_gampwcs()=load_data("gam",1e-12u"hartree",1e-8u"hartree",0.0u"T",1.0u"T",0)
 
-# loads, then saves ages all files in pairwiseCSfunction
-function pairwiseCS_resaver()
-    wd=pwd()
-    cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\PairwiseCS")
-    for f in readdir()
-        load=BSON.load(f)
-        data=σ_output(load[:σ],load[:γ_lookup],load[:ϵ],load[:B],load[:lmax])
-        rm(f) # delete old file
-        save_pairwiseCS(data) # save new file
-    end
-    cd(wd)
-end
+###################################Plotting functions###########################
 
 # create labels for plot legend, from γ_lookup given, keeping order of the lookup
-function label_from_γ_lookup(lookup::Array{γ_ket,1})
+function label_from_lookup(lookup::Union{Array{γ_ket,1}, Array{SmS_ket,1}})
     n=length(lookup)
     lab=fill("",1,length(lookup))
-    for i in 1:n
-        γ=lookup[i]
-        lab[i]="S=$(γ.S), mS=$(γ.mS)"
+    if typeof(lookup)==Array{γ_ket,1} # converting γ_kets: S, mS relevant
+        for i in 1:n
+            ket=lookup[i]
+            lab[i]="S=$(ket.S), mS=$(ket.mS)"
+        end
+    else # converting SmS_kets; S, mS, l, ml relevant
+        for i in 1:n
+            ket=lookup[i]
+            lab[i]="S=$(ket.S), mS=$(ket.mS), l=$(ket.l), ml=$(ket.ml)"
+        end
     end
     lab
 end
 
 # plot diagonal elements of pairwise σ, i.e. elastic cross sections
-function diff_E_plot(Emin,Emax,B,lmax)
-    datas=load_pairwiseCS(Emin,Emax,B,B,lmax)
+function diff_E_gam_plot(Emin,Emax,B,lmax)
+    datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
     sort!(datas, by=(x->x.ϵ)) # sort by increasing energy
     γ_lookup=datas[1].γ_lookup
@@ -120,6 +188,6 @@ function diff_E_plot(Emin,Emax,B,lmax)
     ϵs=(x->x.ϵ).(datas)
     plot(austrip.(ϵs),austrip.(σs),xlabel="Energy (Eh)", xscale=:log10,
     ylabel="σ (a₀²)",yscale=:log10, minorticks=true,
-    label=label_from_γ_lookup(γ_lookup),legend=:outertopright)
+    label=label_from_lookup(γ_lookup),legend=:outertopright)
     hline!([4*pi*austrip((7.54u"nm")^2)])
 end
