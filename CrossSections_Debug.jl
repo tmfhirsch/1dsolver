@@ -1,3 +1,4 @@
+"""Debugging of CrossSections - follow matrices through the calc 17/09/20"""
 #= Multichannel equations solver. Uses symmetrised |a⟩ basis states and all
 of the interactions except for the Zeeman interaction.
 All states up to and including the lmax parameter are used
@@ -5,13 +6,19 @@ F matrix matches boundary conditions, K matrix matches to bessel functions
 σ_matrix uses the other functions to produce cross sections from high-level inpt
 Description last updated 9/09/20=#
 
-module CrossSections
-export σ_output, σ_matrix, γ_output, σ2γ_output
-
 using HalfIntegers, LinearAlgebra, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Interactions, StateStructures
+
+# parameters
+ϵ, B, lmax= 1e-12u"hartree", 0u"T", 6::Int
+# matrices to store
+AL=nothing;BR=nothing;AR=nothing;BL=nothing;
+Σ=nothing;V=nothing;
+F=nothing;K=nothing;S=nothing;T=nothing;
+
+
 
 """Callback function for renormalisation of wavefunction. Code by DC"""
 function CreateRenormalisedCallback(maxval=1e5)
@@ -117,11 +124,12 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
     # match for A, B where G=J.A-N.B
     #construct G, G' matrices to match for A, B with
     n=Int(size(𝐅,1)/2) # n = number of channels. Assumes sol in above form.
-    @assert size(𝐅,2) == n "solution matrix not of shape 2n × n"
-    G, G⁻ = austrip.(copy(𝐅[1:n,1:n])), copy(𝐅[n+1:2*n,1:n])
+    nICs=size(𝐅,2) #number of ICs
+    #@assert size(𝐅,2) == n "solution matrix not of shape 2n × n"
+    G, G⁻ = austrip.(copy(𝐅[1:n,:])), copy(𝐅[n+1:2*n,:])
     # solve for A,B
     A, B = zeros(ComplexF64,n,n), zeros(ComplexF64,n,n) # initialise
-    for i in 1:n, j in 1:n
+    for i in 1:n, j in 1:nICs
         # construct [jᵢ nᵢ; jᵢ' nᵢ'] matrix, here called [bj -bn; bj⁻ -bn⁻]
         # expressions for derivatives (⁻) calculated using Mathematica
         # function form from Mies (A2) which ≡ Cocks et al (59)
@@ -134,10 +142,10 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
         bn⁻=austrip(sqrt(k))*((l+1)*sphericalbessely(l,k*R)
             -k*R*sphericalbessely(l+1,k*R))
         Gᵢⱼ, G⁻ᵢⱼ = G[i,j], G⁻[i,j]
-        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], solve J;-N*AB=G;G⁻
+        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], [J;-N]*AB=[G;G⁻]
         A[i,j], B[i,j] = AB
     end
-    𝐊 = B*inv(A)
+    𝐊 = B*inv(A) #TODO doesn't work for single channel IC
     return 𝐊
 end
 
@@ -159,11 +167,12 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     @assert size(AL,1)==2*length(isOpen) "Number of rows of AL/AR/BL/BR not equal
         to 2* number of rows of isOpen vector"
     # numbers of channel, for reference
-    N = length(isOpen) # N channels
+    N = size(AL,2) # N channels considered
     Nₒ = size(BL,2)-N # Nₒ open channels
+    # redefing N, Nₒ for single channel IC experiment
     # take SVD
     x = svd(austrip.([AR -BL]), full=true) # the SVD object
-    Σ, V = x.S, x.V # extract singular values and V matrix
+    Σ, V = x.S, x.V; global Σ=Σ; global V=V; # extract singular values and V matrix
     CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
@@ -214,26 +223,33 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     Nₒ=count(isOpen); Nₒ==0 && return("No open channels!")
     @assert length(findall(isOpen))==length(𝐤Open)==Nₒ "number of
     open channels disagrees between isOpen, 𝐤Open and 𝐥Open" # sanity check
+    #= matrix BCs below
     # construct BCs
-    AL=[fill(0.0u"bohr",N,N); I]
+    AL=[fill(0.0u"bohr",N,N); I]; global AL=AL;
     BR = let
         BFL = [fill(0.0u"bohr",N,N); I]
         BFR = [Matrix(Diagonal(ones(N))[:,isOpen]u"bohr"); zeros(N,Nₒ)]
         [BFL BFR]
-    end
+    end; global BR=BR;=#
+    # Just singlet |1 1 0 0 0 0 > channel ICs
+    AL=vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)); global AL=AL;
+    BR=[vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)) vcat(zeros(N)u"bohr",1.0,zeros(N-1))]; global BR=BR;
     # solve for inividual BCs
-    AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid)
-    BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
+    AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid); global AR=AR;
+    BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid); global BL=BL;
     # find wavefunction satisfying both BCs only including open channels
-    𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
+    𝐅 = F_matrix(AL,AR,BL,BR,isOpen); global F=𝐅;
     # match to bessel functions to find K matrix
-    𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open)
+    𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open); global K=𝐊;
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
-    𝐒 = (I+im*𝐊)*inv(I-im*𝐊) # Scattering matrix
+    𝐒 = (I+im*𝐊)*inv(I-im*𝐊); global S=𝐒; # Scattering matrix
     𝐓 = I-𝐒 # transition matrix
-    𝐓sq= abs2.(𝐓) # |Tᵢⱼ|² for use in calculating cross sections
+    𝐓sq= abs2.(𝐓); global Tsq=𝐓sq; # |Tᵢⱼ|² for use in calculating cross sections
     return σ_output(𝐓sq,lookup[isOpen],ϵ,B,lmax)
 end
+
+output=σ_matrix(ϵ,B,lmax)
+
 
 # structure for holding |S₁S₂Smₛ⟩ cross sections and the inputs that produced them
 struct γ_output
@@ -272,5 +288,3 @@ function σ2γ_output(output::σ_output; μ=0.5*4.002602u"u")
      end
      return γ_output(σᵧ, γ_lookup, ϵ, B, lmax)
 end
-
-end # module

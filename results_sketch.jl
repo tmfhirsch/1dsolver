@@ -6,14 +6,14 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\15-9-20-tests\h-SmS-PairwiseCS"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\15-9-20-tests\h-gam-PairwiseCS"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\17-9-20-tests\norm"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\17-9-20-tests\norm"
 
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
     cd(SmSpwcs_dir)
-    date_str=string(Dates.today())
+    date_str=string(Dates.  today())
     params_str="_E"*string(ustrip(uconvert(u"hartree",data.ϵ)))*"_B"*
     string(ustrip(uconvert(u"T",data.B)))*"_lmax"*string(data.lmax)
     save_str=date_str*params_str*".SmSpwcs"
@@ -22,8 +22,8 @@ function save_SmSpwcs(data::σ_output)
 end
 
 #checks that save_pairwiseCS runs for 1e-12 Eh, 0.01T, lmax=0
-function test_save_SmSpwcs()
-    output=σ_matrix(1e-12u"hartree",0.01u"T",0)
+function test_save_SmSpwcs(;ϵ=1e-12u"hartree",B=0u"T",lmax=0)
+    output=σ_matrix(ϵ,B,lmax)
     save_SmSpwcs(output)
 end
 
@@ -173,7 +173,7 @@ function label_from_lookup(lookup::Union{Array{γ_ket,1}, Array{SmS_ket,1}})
 end
 
 # plot diagonal elements of pairwise σ, i.e. elastic cross sections
-function diff_E_gam_plot(Emin,Emax,B,lmax)
+function diffE_gam_plot(Emin,Emax,B,lmax)
     datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
     sort!(datas, by=(x->x.ϵ)) # sort by increasing energy

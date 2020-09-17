@@ -16,6 +16,13 @@ function test_solver(;lmax=0,B=0u"T")
     IC=[fill(0.0u"bohr",n,n); I]
     println("Starting to solve for wavefunctions, lmax=$lmax")
     sol=solver(lookup, IC, ϵ, lhs, rhs,B=B)
+    #= plot code only works if save_everywhere=false is changed in solver()
+    plt = let
+        Rs=LinRange(lhs,rhs,1000)
+        vals=getindex.(sol.(Rs),n,n) # first channel, first IC
+        plot(austrip.(Rs),real.(austrip.(vals)))
+    end
+    plt=#
     println("Solved!")
 end
 
