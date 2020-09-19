@@ -206,6 +206,7 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
         if austrip(ksq) >= 0
             isOpen[i] = true
             push!(𝐤Open,uconvert(u"bohr^-1",sqrt(ksq)))
+
             push!(𝐥Open,ϕ.l)
         else # ksq < 0 ⟺ closed channel
             isOpen[i] = false

@@ -15,9 +15,8 @@ using Interactions, StateStructures
 ϵ, B, lmax= 1e-12u"hartree", 0u"T", 6::Int
 # matrices to store
 AL=nothing;BR=nothing;AR=nothing;BL=nothing;
-Σ=nothing;V=nothing;
+V=nothing;
 F=nothing;K=nothing;S=nothing;T=nothing;
-
 
 
 """Callback function for renormalisation of wavefunction. Code by DC"""
@@ -145,7 +144,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
         AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], [J;-N]*AB=[G;G⁻]
         A[i,j], B[i,j] = AB
     end
-    𝐊 = B*inv(A) #TODO doesn't work for single channel IC
+    𝐊 = B*inv(A)
     return 𝐊
 end
 
@@ -170,17 +169,21 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     N = size(AL,2) # N channels considered
     Nₒ = size(BL,2)-N # Nₒ open channels
     # redefing N, Nₒ for single channel IC experiment
-    # take SVD
+    #= take SVD
     x = svd(austrip.([AR -BL]), full=true) # the SVD object
-    Σ, V = x.S, x.V; global Σ=Σ; global V=V; # extract singular values and V matrix
-    CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
+    V = x.V; global V=V; # extract singular values and V matrix
+    CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ=#
+    #QR version 19/9/20
+    Q = qr(austrip.(permutedims([AR -BL]))).Q
+    CD=Q[:,end-Nₒ+1:end]
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
     @assert size(CD,2)==Nₒ "[C; D] doesn't have Nₒ columns"
-    C = CD[1:N,:]
-    D = CD[(N+1):end,:]
+    C = CD[1:N,:]; global C=C;
+    D = CD[(N+1):end,:]; global D=D;
     # forming F
     F = BR*D
+    @show maximum(abs.(austrip.(BL*D-AR*C)))
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
 end
 
@@ -223,17 +226,16 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     Nₒ=count(isOpen); Nₒ==0 && return("No open channels!")
     @assert length(findall(isOpen))==length(𝐤Open)==Nₒ "number of
     open channels disagrees between isOpen, 𝐤Open and 𝐥Open" # sanity check
-    #= matrix BCs below
     # construct BCs
     AL=[fill(0.0u"bohr",N,N); I]; global AL=AL;
     BR = let
         BFL = [fill(0.0u"bohr",N,N); I]
         BFR = [Matrix(Diagonal(ones(N))[:,isOpen]u"bohr"); zeros(N,Nₒ)]
         [BFL BFR]
-    end; global BR=BR;=#
-    # Just singlet |1 1 0 0 0 0 > channel ICs
-    AL=vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)); global AL=AL;
-    BR=[vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)) vcat(zeros(N)u"bohr",1.0,zeros(N-1))]; global BR=BR;
+    end; global BR=BR;
+    #=# Just singlet |1 1 0 0 0 0 > channel ICs
+    AL=vcat(zeros(N)u"bohr",1.0,zeros(N-1)); global AL=AL;
+    BR=[vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)) vcat(zeros(N)u"bohr",1.0,zeros(N-1))]; global BR=BR;=#
     # solve for inividual BCs
     AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid); global AR=AR;
     BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid); global BL=BL;
@@ -243,7 +245,7 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open); global K=𝐊;
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
     𝐒 = (I+im*𝐊)*inv(I-im*𝐊); global S=𝐒; # Scattering matrix
-    𝐓 = I-𝐒 # transition matrix
+    𝐓 = I-𝐒; global T=𝐓 # transition matrix
     𝐓sq= abs2.(𝐓); global Tsq=𝐓sq; # |Tᵢⱼ|² for use in calculating cross sections
     return σ_output(𝐓sq,lookup[isOpen],ϵ,B,lmax)
 end
