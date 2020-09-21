@@ -173,11 +173,63 @@ function label_from_lookup(lookup::Union{Array{γ_ket,1}, Array{SmS_ket,1}})
     lab
 end
 
+# finds unique kets in an array of σ or γ outputs
+function unqkets(datas)
+    @assert all(x->typeof(x)==σ_output,datas) ||
+        all(x->typeof(x)==γ_output,datas) "datas not a list of σ_outputs or a list of γ_outputs"
+    @assert length(datas)>0 "unqkets is given an empty list of data"
+    if typeof(datas[1])==σ_output
+        σunq::Array{SmS_ket,1}=[]
+        for d in datas # search all data
+            for k in d.lookup
+                if !(k in σunq)  # if data has a as-yet-unseen γ_ket
+                    push!(σunq,k)
+                end
+            end
+        end
+        return σunq
+    else # γ_output data
+        γunq::Array{γ_ket,1}=[]
+        for d in datas # search all data
+            for γ in d.γ_lookup
+                if !(γ in γunq)  # if data has a as-yet-unseen γ_ket
+                    push!(γunq,γ)
+                end
+            end
+        end
+        return γunq
+    end
+end
+
 # plot diagonal elements of pairwise σ, i.e. elastic cross sections
 function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BField,lmax::Int)
     datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
     sort!(datas, by=(x->x.ϵ)) # sort by increasing energy
+    unq = unqkets(reverse(datas)) # reverse to find uniques starting with high energy data
+    pltdata=[] # array to store ([ϵ],[σ}) pairs for the different γ
+    pltlabel=label_from_lookup(unq)
+    for γ in unq
+        datatuple::typeof(([0.0u"hartree"],[0.0u"bohr^2"]))=([],[])
+        for d in datas # already sorted datas by energy
+            if γ in d.γ_lookup
+                dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+                push!(datatuple[1],d.ϵ) # store energy
+                push!(datatuple[2],d.σ[dγ_index,dγ_index]) # store cross section
+            end
+        end
+        push!(pltdata,datatuple)
+    end
+    plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Energy (Eh)", xscale=:log10,
+    ylabel="σ (a₀²)",yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
+    title="B=$B, lmax=$lmax")
+    if length(pltdata)>1 # plot rest of the γ_ket series
+        for i in 2:length(pltdata)
+            plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
+        end
+    end
+    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
+    #=
     γ_lookup=datas[1].γ_lookup
     # check that all data have the same γ_lookup
     @assert all((x->x.γ_lookup==γ_lookup).(datas)) "not all data has same γ_lookup"
@@ -191,4 +243,5 @@ function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BFi
     ylabel="σ (a₀²)",yscale=:log10, minorticks=true,
     label=label_from_lookup(γ_lookup),legend=:outertopright)
     hline!([4*pi*austrip((7.54u"nm")^2)])
+    =#
 end
