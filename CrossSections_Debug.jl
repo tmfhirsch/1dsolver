@@ -12,11 +12,13 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Interactions, StateStructures
 
 # parameters
-ϵ, B, lmax= 1e-12u"hartree", 0u"T", 6::Int
+ϵ, B, lmax= 1e-12u"hartree", 0u"T", 2::Int
 # matrices to store
 AL=nothing;BR=nothing;AR=nothing;BL=nothing;
 V=nothing;
-F=nothing;K=nothing;S=nothing;T=nothing;
+F=nothing;
+K=nothing;AK=nothing;BK=nothing;
+S=nothing;T=nothing;
 
 
 """Callback function for renormalisation of wavefunction. Code by DC"""
@@ -81,10 +83,10 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
         for i=1:n, j=1:n
             V[i,j] = H_rot(lookup[i],lookup[j], x*1u"bohr", μ) # rotational
             V[i,j]+= H_el(lookup[i],lookup[j], x*1u"bohr") # electronic
-            V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
+            #V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole #TODO 21/09
             #imaginary ionization potential width from Garrison et al 1973
             Γ(i,j,x) = (i==j && lookup[i].S∈[0,1]) ? 0.3*exp(-x/1.086) : 0.0
-            V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019) #TODO 17/9 changed sign of ionisation term
+            #V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019) #TODO 17/9 changed sign of ionisation term
             #TODO hyperfine interaction
             V[i,j] += H_zee(lookup[i],lookup[j],B) # zeeman
         end
@@ -144,6 +146,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
         AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], [J;-N]*AB=[G;G⁻]
         A[i,j], B[i,j] = AB
     end
+    global AK=A; global BK=B;
     𝐊 = B*inv(A)
     return 𝐊
 end
@@ -183,7 +186,6 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     D = CD[(N+1):end,:]; global D=D;
     # forming F
     F = BR*D
-    @show maximum(abs.(austrip.(BL*D-AR*C)))
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
 end
 
@@ -202,9 +204,10 @@ end
     γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=50.0u"bohr",
-    rhs::Unitful.Length=10000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
+    rhs::Unitful.Length=1000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
     # lookup vector of |SmS⟩ states to be considered
-    lookup=SmS_lookup_generator(lmax)
+    #lookup=SmS_lookup_generator(lmax)
+    lookup=filter(x->x.S==1,SmS_lookup_generator(lmax))[1:1] # TODO singlet manifold 21/09/20
     N=length(lookup)
     # construct isOpen. simultaneously construct 𝐤 and 𝐥 for K calculation
     isOpen=fill(true,N)

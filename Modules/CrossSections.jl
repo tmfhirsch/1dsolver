@@ -161,10 +161,9 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     # numbers of channel, for reference
     N = length(isOpen) # N channels
     Nₒ = size(BL,2)-N # Nₒ open channels
-    # take SVD
-    x = svd(austrip.([AR -BL]), full=true) # the SVD object
-    Σ, V = x.S, x.V # extract singular values and V matrix
-    CD = V[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
+    # take QR decomposition
+    Q = qr(austrip.(permutedims([AR -BL]))).Q
+    CD = Q[:,(end-Nₒ+1):end] # 4/09/20 cols of V matching to the zero part of Σ
     # sanity check for linear combinations
     @assert size(CD,1)==2*N+Nₒ "[C; D] doesn't have 2*N+N₀ rows"
     @assert size(CD,2)==Nₒ "[C; D] doesn't have Nₒ columns"
@@ -224,7 +223,9 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     end
     # solve for inividual BCs
     AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid)
+    AL = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(lhs) #TODO changed 21/09/20, to get renormalisation of BCs
     BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
+    BR = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(rhs) #TODO changed 21/09/20, to get renormalisation of BCs
     # find wavefunction satisfying both BCs only including open channels
     𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
     # match to bessel functions to find K matrix

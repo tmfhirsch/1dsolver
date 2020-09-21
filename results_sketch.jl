@@ -6,9 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\17-9-20-tests\norm"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\17-9-20-tests\norm"
-
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\21-9-20-tests\c"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\21-9-20-tests\c"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -31,7 +30,8 @@ end
     Inputs: log₁₀(austrip(Emin)), log₁₀(austrip(Emax)), n = number of different energies, lmax;
     B=0T magnetic field strength
     Outputs: / (saves files using save_pairwiseCS)"""
-function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T")
+function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
+    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=1000.0u"bohr")
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
     println("lmax=$lmax. Generating σ_output for E/Eh= ")
     for E in Es
@@ -81,7 +81,8 @@ end
 function σ2γ_data(target="")
     wd=pwd()
     cd(SmSpwcs_dir)
-    for f in readdir() # first check for exact matches; break at first match
+    SmS_files=filter((x->occursin(".SmSpwcs",x)), readdir())
+    for f in SmS_files # first check for exact matches; break at first match
         if target==f
             load=BSON.load(f)
             SmSdata=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
@@ -90,7 +91,7 @@ function σ2γ_data(target="")
             return
         end
     end
-    for f in readdir() # no exact match found; converting all applicable files
+    for f in SmS_files # no exact match found; converting all applicable files
         if occursin(target,f)
             load=BSON.load(f)
             SmSdata=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
@@ -173,7 +174,7 @@ function label_from_lookup(lookup::Union{Array{γ_ket,1}, Array{SmS_ket,1}})
 end
 
 # plot diagonal elements of pairwise σ, i.e. elastic cross sections
-function diffE_gam_plot(Emin,Emax,B,lmax)
+function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BField,lmax::Int)
     datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
     sort!(datas, by=(x->x.ϵ)) # sort by increasing energy
