@@ -6,8 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\a"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\a"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\c-rrhs-at-1e5bohr"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\c-rrhs-at-1e5bohr"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -31,12 +31,12 @@ end
     B=0T magnetic field strength
     Outputs: / (saves files using save_pairwiseCS)"""
 function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
-    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=1000.0u"bohr")
+    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=10000.0u"bohr")
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
     println("lmax=$lmax, B=$B. Generating σ_output for E/Eh= ")
     for E in Es
         println("$(austrip(E)), ")
-        output=σ_matrix(E,B,lmax,lhs=lhs,mid=mid,rhs=rhs)
+        output=σ_matrix(E,B,lmax,lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
         save_SmSpwcs(output)
     end
 end
@@ -229,19 +229,4 @@ function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BFi
         end
     end
     hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
-    #=
-    γ_lookup=datas[1].γ_lookup
-    # check that all data have the same γ_lookup
-    @assert all((x->x.γ_lookup==γ_lookup).(datas)) "not all data has same γ_lookup"
-    no_γ, no_datas = length(γ_lookup), length(datas)
-    σs=zeros(no_datas,no_γ)u"bohr^2" # row = diff. energy, col = diff. state
-    for γ in 1:no_γ, d in 1:no_datas
-        σs[d,γ]=datas[d].σ[γ,γ] # diag elements ↔ elastic scattering
-    end
-    ϵs=(x->x.ϵ).(datas)
-    plot(austrip.(ϵs),austrip.(σs),xlabel="Energy (Eh)", xscale=:log10,
-    ylabel="σ (a₀²)",yscale=:log10, minorticks=true,
-    label=label_from_lookup(γ_lookup),legend=:outertopright)
-    hline!([4*pi*austrip((7.54u"nm")^2)])
-    =#
 end

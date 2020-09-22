@@ -93,8 +93,8 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
     callback=CreateRenormalisedCallback()
-    sol_unitless=solve(prob,Tsit5(),reltol=1e-10,save_end=true,save_everystep=false,dense=false,
-    callback=callback)
+    sol_unitless=solve(prob,Tsit5(),reltol=1e-10,save_start=true,save_end=true,save_everystep=false,dense=false,
+    callback=callback) #TODO added save_start 22/9/20, need to test for lmax>0
     # add units back
     units = vcat(fill(1.0u"bohr",n),fill(1.0,n))
     sol = x -> sol_unitless(austrip(x)).*units
@@ -189,7 +189,8 @@ end
     γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=50.0u"bohr",
-    rhs::Unitful.Length=10000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
+    rhs::Unitful.Length=200.0u"bohr", rrhs::Unitful.Length=10000.0u"bohr",
+    μ::Unitful.Mass=0.5*4.002602u"u")
     # lookup vector of |SmS⟩ states to be considered
     lookup=SmS_lookup_generator(lmax)
     N=length(lookup)
@@ -222,14 +223,20 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
         [BFL BFR]
     end
     # solve for inividual BCs
-    AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid)
-    AL = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(lhs) #TODO changed 21/09/20, to get renormalisation of BCs
+    Asol = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)
+    AL, AR = Asol(lhs), Asol(mid)
+    Bsol = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)
+    BL, BR = Bsol(mid), Bsol(rhs)
+    #=AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid) #TODO replaced 22/9/20
+    AL = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(lhs)
     BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
-    BR = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(rhs) #TODO changed 21/09/20, to get renormalisation of BCs
+    BR = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(rhs)=#
     # find wavefunction satisfying both BCs only including open channels
     𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
+    # solve matched wavefunction out to rrhs TODO added 22/9/20
+    𝐅 = solver(lookup[isOpen],𝐅,ϵ,rhs,rrhs,B=B,μ=μ)(rrhs)
     # match to bessel functions to find K matrix
-    𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open)
+    𝐊 = K_matrix(rrhs,𝐅,𝐤Open,𝐥Open)
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
     𝐒 = (I+im*𝐊)*inv(I-im*𝐊) # Scattering matrix
     𝐓 = I-𝐒 # transition matrix
