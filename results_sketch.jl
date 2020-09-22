@@ -6,8 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\21-9-20-tests\c"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\21-9-20-tests\c"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\a"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\22-9-20-tests\a"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -33,10 +33,10 @@ end
 function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
     lhs=3.0u"bohr",mid=50.0u"bohr",rhs=1000.0u"bohr")
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
-    println("lmax=$lmax. Generating σ_output for E/Eh= ")
+    println("lmax=$lmax, B=$B. Generating σ_output for E/Eh= ")
     for E in Es
         println("$(austrip(E)), ")
-        output=σ_matrix(E,B,lmax)
+        output=σ_matrix(E,B,lmax,lhs=lhs,mid=mid,rhs=rhs)
         save_SmSpwcs(output)
     end
 end

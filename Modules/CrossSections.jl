@@ -78,7 +78,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
             V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
             #imaginary ionization potential width from Garrison et al 1973
             Γ(i,j,x) = (i==j && lookup[i].S∈[0,1]) ? 0.3*exp(-x/1.086) : 0.0
-            V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019) #TODO 17/9 changed sign of ionisation term
+            V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019)
             #TODO hyperfine interaction
             V[i,j] += H_zee(lookup[i],lookup[j],B) # zeeman
         end
