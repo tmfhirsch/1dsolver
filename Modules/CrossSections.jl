@@ -189,7 +189,7 @@ end
     γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=50.0u"bohr",
-    rhs::Unitful.Length=200.0u"bohr", rrhs::Unitful.Length=10000.0u"bohr",
+    rhs::Unitful.Length=200.0u"bohr", rrhs::Unitful.Length=1e6u"bohr",
     μ::Unitful.Mass=0.5*4.002602u"u")
     # lookup vector of |SmS⟩ states to be considered
     lookup=SmS_lookup_generator(lmax)

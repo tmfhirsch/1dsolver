@@ -12,12 +12,13 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Interactions, StateStructures
 
 # parameters
-ϵ, B, lmax= 1e-12u"hartree", 0u"T", 2::Int
+ϵ, B, lmax= 1e-12u"hartree", 0u"T", 6::Int
+lhs,mid,rhs,rrhs=3e0u"bohr", 6e1u"bohr", 1e2u"bohr", 1e6u"bohr"
 # matrices to store
 AL=nothing;BR=nothing;AR=nothing;BL=nothing;
 V=nothing;
 F=nothing;
-K=nothing;AK=nothing;BK=nothing;
+K=nothing;KA=nothing;KB=nothing;
 S=nothing;T=nothing;
 
 
@@ -83,7 +84,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
         for i=1:n, j=1:n
             V[i,j] = H_rot(lookup[i],lookup[j], x*1u"bohr", μ) # rotational
             V[i,j]+= H_el(lookup[i],lookup[j], x*1u"bohr") # electronic
-            #V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole #TODO 21/09
+            V[i,j]+= C_sd[i,j]*H_sd_radial(x*1u"bohr") # spin-dipole
             #imaginary ionization potential width from Garrison et al 1973
             Γ(i,j,x) = (i==j && lookup[i].S∈[0,1]) ? 0.3*exp(-x/1.086) : 0.0
             #V[i,j]-= im/2*Γ(i,j,x)*1u"hartree" # Cocks et al (2019) #TODO 17/9 changed sign of ionisation term
@@ -101,8 +102,8 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     # solve
     prob=ODEProblem(TISE,IC⁰,(lhs⁰,rhs⁰))
     callback=CreateRenormalisedCallback()
-    sol_unitless=solve(prob,Tsit5(),reltol=1e-10,save_end=true,save_everystep=false,dense=false,
-    callback=callback)
+    sol_unitless=solve(prob,Tsit5(),reltol=1e-10,start_start=true,save_end=true,
+        save_everystep=false,dense=false,callback=callback)
     # add units back
     units = vcat(fill(1.0u"bohr",n),fill(1.0,n))
     sol = x -> sol_unitless(austrip(x)).*units
@@ -146,7 +147,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
         AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], [J;-N]*AB=[G;G⁻]
         A[i,j], B[i,j] = AB
     end
-    global AK=A; global BK=B;
+    global KA=A; global KB=B;
     𝐊 = B*inv(A)
     return 𝐊
 end
@@ -203,11 +204,12 @@ end
     Output: σ_output containing: σ where σ[i,j]=σ(γ_lookup[j]→γ_lookup[i]),
     γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
 function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
-    lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=50.0u"bohr",
-    rhs::Unitful.Length=1000.0u"bohr",μ::Unitful.Mass=0.5*4.002602u"u")
+    lhs::Unitful.Length=3.0u"bohr", mid::Unitful.Length=30.0u"bohr",
+    rhs::Unitful.Length=200.0u"bohr", rrhs::Unitful.Length=1e6u"bohr",
+    μ::Unitful.Mass=0.5*4.002602u"u")
     # lookup vector of |SmS⟩ states to be considered
-    #lookup=SmS_lookup_generator(lmax)
-    lookup=filter(x->x.S==1,SmS_lookup_generator(lmax))[1:1] # TODO singlet manifold 21/09/20
+    lookup=SmS_lookup_generator(lmax)
+    #lookup=filter(x->x.S==1,SmS_lookup_generator(lmax))[1:1] # TODO singlet manifold 21/09/20
     N=length(lookup)
     # construct isOpen. simultaneously construct 𝐤 and 𝐥 for K calculation
     isOpen=fill(true,N)
@@ -236,14 +238,14 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
         BFR = [Matrix(Diagonal(ones(N))[:,isOpen]u"bohr"); zeros(N,Nₒ)]
         [BFL BFR]
     end; global BR=BR;
-    #=# Just singlet |1 1 0 0 0 0 > channel ICs
-    AL=vcat(zeros(N)u"bohr",1.0,zeros(N-1)); global AL=AL;
-    BR=[vcat(1u"bohr",zeros(N-1)u"bohr",zeros(N)) vcat(zeros(N)u"bohr",1.0,zeros(N-1))]; global BR=BR;=#
-    # solve for inividual BCs
-    AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid); global AR=AR;
-    BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid); global BL=BL;
+    Asol = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)
+    AL, AR = Asol(lhs), Asol(mid); global AR=AR;
+    Bsol = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)
+    BL, BR = Bsol(mid), Bsol(rhs); global BL=BL;
     # find wavefunction satisfying both BCs only including open channels
     𝐅 = F_matrix(AL,AR,BL,BR,isOpen); global F=𝐅;
+    # solve matched wavefunction out to rrhs TODO added 22/9/20
+    𝐅 = solver(lookup[isOpen],𝐅,ϵ,rhs,rrhs,B=B,μ=μ)(rrhs)
     # match to bessel functions to find K matrix
     𝐊 = K_matrix(rhs,𝐅,𝐤Open,𝐥Open); global K=𝐊;
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
@@ -253,7 +255,9 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int;
     return σ_output(𝐓sq,lookup[isOpen],ϵ,B,lmax)
 end
 
-output=σ_matrix(ϵ,B,lmax)
+@info ϵ,B,lmax
+@info lhs,mid,rhs,rrhs
+output=σ_matrix(ϵ,B,lmax,lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
 
 
 # structure for holding |S₁S₂Smₛ⟩ cross sections and the inputs that produced them
