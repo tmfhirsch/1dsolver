@@ -6,8 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\23-9-20-tests\a"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\23-9-20-tests\a"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\24-9-20-tests"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\24-9-20-tests"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -31,12 +31,12 @@ end
     B=0T magnetic field strength
     Outputs: / (saves files using save_pairwiseCS)"""
 function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
-    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e6u"bohr")
+    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
     println("lmax=$lmax, B=$B. Generating σ_output for E/Eh= ")
     for E in Es
         println("$(austrip(E)), ")
-        output=σ_matrix(E,B,lmax,lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
+        output=σ_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
         save_SmSpwcs(output)
     end
 end

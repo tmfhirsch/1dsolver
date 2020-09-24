@@ -12,8 +12,8 @@ push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHY
 using Interactions, StateStructures
 
 # parameters
-ϵ, B, lmax= 1e-12u"hartree", 0u"T", 6::Int
-lhs,mid,rhs,rrhs=3e0u"bohr", 6e1u"bohr", 1e2u"bohr", 1e6u"bohr"
+ϵ, B, lmax= 1e-12u"hartree", 1e-3u"T", 6::Int
+lhs,mid,rhs,rrhs=3e0u"bohr", 6e1u"bohr", 2e2u"bohr", 1e6u"bohr"
 # matrices to store
 AL=nothing;BR=nothing;AR=nothing;BL=nothing;
 V=nothing;
