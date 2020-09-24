@@ -7,5 +7,5 @@ function H_zee(bra::Union{SmS_ket,γ_ket},ket::Union{SmS_ket,γ_ket},B::Unitful.
     # diagonal in SmS kets
     bra == ket || return 0.0u"hartree"
     S_z = (ket.mS)*1u"ħ"
-    return uconvert(u"hartree",0.5u"e_au/me_au"*gₛ*B*S_z)
+    return uconvert(u"hartree",-0.5u"e_au/me_au"*gₛ*B*S_z)
 end
