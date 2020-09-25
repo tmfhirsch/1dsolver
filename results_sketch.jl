@@ -6,8 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\24-9-20-tests"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\24-9-20-tests"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\b"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\b"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -41,6 +41,22 @@ function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
     end
 end
 
+""" generate and save .SmSpwcs for different magnetic field strengths (in T), linearly spaced,
+    with constant E.
+    Inputs: Bmin~[BField], Bmax~[BField], n = number of different Bfields, E~[E], lmax;
+    lhs~[L]=3aₒ, mid~[L]=50aₒ, rhs~[L]=200aₒ, rrhs~[L]=1e4aₒ
+    Outputs: / (saves files using save_pairwiseCS)"""
+function gen_diffB_constE_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Integer,E::Unitful.Energy,lmax::Integer;
+    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
+    Bs=LinRange(Bmin,Bmax,n) # energies
+    println("lmax=$lmax, E=$E. Generating σ_output for B/1T= ")
+    for B in Bs
+        println("$(ustrip(uconvert(u"T",B))), ")
+        output=σ_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
+        save_SmSpwcs(output)
+    end
+end
+
 # loads, then resaves all files in pairwiseCSfunction; for changing name schemes
 function SmSpwcs_resaver()
     wd=pwd()
@@ -54,8 +70,47 @@ function SmSpwcs_resaver()
     cd(wd)
 end
 
+# asymptotic wavenumber as function of state, energy, Bfield
+function k∞(ket::Union{SmS_ket,γ_ket},ϵ::Unitful.Energy,B::Unitful.BField;
+    μ::Unitful.Mass=0.5*4.002602u"u")
+    V∞ = H_zee(ket,ket,B)
+    k = auconvert(sqrt(Complex(2)*μ*(ϵ-V∞))/1u"ħ")
+    k
+end
+
+# asymptotic energy as function of state, wavenumber, Bfield
+function E∞(ket::Union{SmS_ket,γ_ket},k::typeof(0e0u"bohr^-1"),B::Unitful.BField;
+    μ::Unitful.Mass=0.5*4.002602u"u")
+    uconvert(u"hartree", 1u"ħ^2"*k^2/(2*μ) + H_zee(ket,ket,B))
+end
+
+
+"""Generates data for different B fields for the same k(γ), iterating over all γ
+    Inputs: Bmin, Bmax, n, k, lmax
+    Output: / saves output, iterating over all B, for all l=0⟺S∈{0,2} γ kets for given k"""
+function gen_diffB_constk_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Integer,
+    k::typeof(0e0u"bohr^-1"), lmax::Int; μ::Unitful.Mass=0.5*4.002602u"u",
+    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
+    Bs=LinRange(Bmin,Bmax,n)
+    l0γs = let
+        allγ = γ_lookup_generator() # all S=0,1,2 γ states
+        allγ[findall(x->x.S!=1,allγ)] # no S=1 because zeroing out l>0 states
+    end
+    println("Generating outputs for k=$k, lmax=$lmax")
+    for γ in l0γs, B in Bs
+        E = E∞(γ,k,B)
+        println("B=$B, γ=$γ")
+        preexisting=load_data("SmS",E,E,B,B)
+        if length(preexisting)>0 # skip data that has already been generated
+            continue
+        end
+        output=σ_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
+        save_SmSpwcs(output)
+    end
+end
+
 #################################.gampwcs functions#############################
-# saves γ_output as a .gampwcs file in ./gampwcs_dir/, E in Eh and B in T
+# saves γ_output as a .gampwcs file in ./gampwcs_dir/, E in Eh and B in Tk=
 function save_gampwcs(data::γ_output)
     wd=pwd()
     cd(gampwcs_dir)
@@ -201,7 +256,7 @@ function unqkets(datas)
     end
 end
 
-# plot diagonal elements of pairwise σ, i.e. elastic cross sections
+# plot diagonal elements of pairwise σ (i.e. elastic cross sections) vs Energy
 function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BField,lmax::Int)
     datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
@@ -229,4 +284,89 @@ function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BFi
         end
     end
     hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
+end
+
+"""
+Plot diagonal elements of pairwise σ (i.e. elastic cross sections) vs wavenumber
+Inputs: kmin~[L]⁻¹, kmax~[L]⁻¹ for plot x axis, B~[BField],lmax;
+    Emin~[E]=0Eₕ, Emax~[E]=1Eₕ for finding appropriate data
+Output: plot of elastic cross sections vs k"""
+function diffk_gam_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
+    B::Unitful.BField,lmax::Int;
+    Emin::Unitful.Energy=0.0u"hartree",Emax::Unitful.Energy=1.0u"hartree")
+    # load all data with correct B
+    datas=load_data("gam",Emin,Emax,B,B,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.ϵ)) # sort by increasing energy
+    unq = unqkets(reverse(datas)) # reverse to find uniques starting with high energy data
+    pltdata=[] # array to store ([k],[σ}) pairs for the different γ
+    pltlabel=label_from_lookup(unq)
+    for γ in unq
+        datatuple::typeof(([0.0u"bohr^-1"],[0.0u"bohr^2"]))=([],[])
+        for d in datas # already sorted datas by energy
+            if γ in d.γ_lookup
+                dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+                k=k∞(γ,d.ϵ,B) # the asymptotic wavenumber for this particular data
+                imag(k)==0.0u"bohr^-1" || continue # don't store if the wavenumber is complex⟺channel closed
+                kmin < real(k) < kmax || continue # don't store if the wavenumber is out of bounds
+                push!(datatuple[1],k) # store wavenumber
+                push!(datatuple[2],d.σ[dγ_index,dγ_index]) # store cross section
+            end
+        end
+        push!(pltdata,datatuple)
+    end
+    # plot first γ_ket
+    plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Wavenumber (a₀⁻¹)", xscale=:log10,
+    ylabel="σ (a₀²)",yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
+    title="B=$B, lmax=$lmax")
+    if length(pltdata)>1 # plot rest of the γ_kets
+        for i in 2:length(pltdata)
+            plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
+        end
+    end
+    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
+end
+
+
+"""
+    Plot diagonal elements of pairwise σ (i.e. elastic cross sections) vs Bfield
+    at constant wavenumber
+Inputs: Bmin~[BField], Bmax~[BField], k~[L]⁻¹ for plot x axis, lmax;
+    Emin~[E]=0Eₕ, Emax~[E]=1Eₕ for finding appropriate data
+Output: plot of elastic cross sections vs B"""
+function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
+    k::typeof(0e0u"bohr^-1"),lmax::Integer;
+    Emin::Unitful.Energy=-(Inf)u"hartree",Emax::Unitful.Energy=(Inf)u"hartree")
+    # load all data with correct B
+    datas=load_data("gam",Emin,Emax,Bmin,Bmax,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.B)) # sort by increasing Bfield
+    unq = unqkets(reverse(datas)) # reverse to find uniques starting with high energy data
+    pltdata=[] # array to store ([B],[σ}) pairs for the different γ
+    pltlabel=label_from_lookup(unq)
+    for γ in unq
+        γdata::typeof(([0.0u"T"],[0.0u"bohr^2"]))=([],[]) # data for this γ
+        for d in datas # already sorted datas by energy
+            if γ in d.γ_lookup # in case γ is closed in this data
+                dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+                # need match of energy to B field for this γ
+                d.ϵ==E∞(γ,k,d.B) || continue
+                push!(γdata[1],d.B) # store Bfield
+                push!(γdata[2],d.σ[dγ_index,dγ_index]) # store el cross section
+            end
+        end
+        #TODO sort γdata to have correct B field ordering
+        push!(pltdata,γdata)
+    end
+    # plot first γ_ket
+    plt=plot(ustrip.(uconvert.(u"T",pltdata[1][1])),austrip.(pltdata[1][2]),xlabel="B (T)",
+    ylabel="σ (a₀²)", yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
+    title="k=$k, lmax=$lmax")
+    if length(pltdata)>1 # plot rest of the γ_kets
+        for i in 2:length(pltdata)
+            plot!(austrip.(uconvert.(u"T",pltdata[i][1])),austrip.(pltdata[i][2]),label=pltlabel[i])
+        end
+    end
+    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
+    plt
 end

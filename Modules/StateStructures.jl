@@ -1,7 +1,7 @@
 module StateStructures
 
 #########= |S₁S₂Smₛ⟩|lmₗ⟩  kets, from Beams et al. (2006)=########################
-export SmS_ket, SmS_lookup_generator, γ_ket, γ_ket_convert
+export SmS_ket, SmS_lookup_generator, γ_ket, γ_lookup_generator, γ_ket_convert
 
 # S₁S₂ quantum numbers (=1,1 for He*)
 struct SmS_Γ_nos # not using halfintegers since working in with metastable helium
@@ -14,6 +14,20 @@ struct γ_ket
     Γ :: SmS_Γ_nos
     S :: Int
     mS :: Int
+end
+
+"""Generates all |...SmS⟩ states"""
+function γ_lookup_generator()
+    lookup = Vector{γ_ket}()
+    for S₁ in 1:1, S₂ in 1:1
+        Γ=SmS_Γ_nos(S₁,S₂)
+        for S in abs(S₁-S₂):1:(S₁+S₂)
+            for mS in -S:1:S
+                push!(lookup, γ_ket(Γ,S,mS))
+            end
+        end
+    end
+    lookup
 end
 
 # |Smₛ⟩=|S₁S₂Smₛlmₗ⟩ kets, used as channels for calculating wavefunctions

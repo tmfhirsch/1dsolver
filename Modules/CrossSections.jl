@@ -200,6 +200,10 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
     𝐥Open=Array{Int,1}([])
     for i in 1:N
         ϕ = lookup[i] # channel
+        if ϕ.l>0 #TODO added 25/9/20, artificially zeroes out l>0 channels
+            isOpen[i] = false
+            continue
+        end
         R∞ = Inf*1u"bohr"
         V∞ = H_el(ϕ,ϕ,R∞) + H_sd_coeffs(ϕ,ϕ)*H_sd_radial(R∞) + H_rot(ϕ,ϕ,R∞,μ) + H_zee(ϕ,ϕ,B)
         ksq = 2*μ*(ϵ-V∞)/1u"ħ^2"
