@@ -190,8 +190,9 @@ function load_data(flag::String,Emin::Unitful.Energy,Emax::Unitful.Energy,
             parse(Float64,str)u"T"
         end
         flmax=let
-            Index=findfirst("lmax",f)[end]+1
-            str=f[Index]
+            SIndex=findfirst("lmax",f)[end]+1
+            EIndex=findfirst(filetype,f)[1]-1
+            str=f[SIndex:EIndex]
             parse(Int,str)
         end
         (Emin<=fE<=Emax)&&(Bmin<=fB<=Bmax)&&(flmax==lmax) || continue
