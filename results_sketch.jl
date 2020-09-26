@@ -6,8 +6,12 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\c"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\c"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\26-9-20-tests"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\26-9-20-tests"
+
+# parameters for ICs/matching
+const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e4u"bohr"
+
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -31,7 +35,7 @@ end
     B=0T magnetic field strength
     Outputs: / (saves files using save_pairwiseCS)"""
 function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
-    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
+    lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
     println("lmax=$lmax, B=$B. Generating σ_output for E/Eh= ")
     for E in Es
@@ -47,7 +51,7 @@ end
     lhs~[L]=3aₒ, mid~[L]=50aₒ, rhs~[L]=200aₒ, rrhs~[L]=1e4aₒ
     Outputs: / (saves files using save_pairwiseCS)"""
 function gen_diffB_constE_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Integer,E::Unitful.Energy,lmax::Integer;
-    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
+    lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
     Bs=LinRange(Bmin,Bmax,n) # energies
     println("lmax=$lmax, E=$E. Generating σ_output for B/1T= ")
     for B in Bs
@@ -77,7 +81,7 @@ end
     Output: / saves output, iterating over all B, for all l=0⟺S∈{0,2} γ kets for given k"""
 function gen_diffB_constk_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Integer,
     k::typeof(0e0u"bohr^-1"), lmax::Int; μ::Unitful.Mass=0.5*4.002602u"u",
-    lhs=3.0u"bohr",mid=50.0u"bohr",rhs=200.0u"bohr",rrhs=1e4u"bohr")
+    lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
     Bs=LinRange(Bmin,Bmax,n)
     l0γs = let
         allγ = γ_lookup_generator() # all S=0,1,2 γ states
@@ -293,7 +297,7 @@ Inputs: kmin~[L]⁻¹, kmax~[L]⁻¹ for plot x axis, B~[BField],lmax;
 Output: plot of elastic cross sections vs k"""
 function diffk_gam_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     B::Unitful.BField,lmax::Int;
-    Emin::Unitful.Energy=0.0u"hartree",Emax::Unitful.Energy=1.0u"hartree")
+    Emin::Unitful.Energy=-(Inf)u"hartree",Emax::Unitful.Energy=(Inf)u"hartree")
     # load all data with correct B
     datas=load_data("gam",Emin,Emax,B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"

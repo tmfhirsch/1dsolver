@@ -231,10 +231,6 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
     AL, AR = Asol(lhs), Asol(mid)
     Bsol = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)
     BL, BR = Bsol(mid), Bsol(rhs)
-    #=AR = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(mid) #TODO replaced 22/9/20
-    AL = solver(lookup, AL, ϵ, lhs, mid,B=B,μ=μ)(lhs)
-    BL = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(mid)
-    BR = solver(lookup, BR, ϵ, rhs, mid,B=B,μ=μ)(rhs)=#
     # find wavefunction satisfying both BCs only including open channels
     𝐅 = F_matrix(AL,AR,BL,BR,isOpen)
     # solve matched wavefunction out to rrhs TODO added 22/9/20
