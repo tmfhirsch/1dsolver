@@ -6,8 +6,8 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
-const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\b"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\b"
+const SmSpwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\c"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\25-9-20-tests\c"
 # saves pairwise cross section output in ./SmSpwcs_dir/, E in Eh and B in T
 function save_SmSpwcs(data::σ_output)
     wd=pwd() # current directory, to move back into at the end
@@ -57,19 +57,6 @@ function gen_diffB_constE_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Inte
     end
 end
 
-# loads, then resaves all files in pairwiseCSfunction; for changing name schemes
-function SmSpwcs_resaver()
-    wd=pwd()
-    cd(SmSpwcs_dir)
-    for f in readdir()
-        load=BSON.load(f)
-        data=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
-        #rm(f) # delete old file
-        save_SmSpwcs(data) # save new file
-    end
-    cd(wd)
-end
-
 # asymptotic wavenumber as function of state, energy, Bfield
 function k∞(ket::Union{SmS_ket,γ_ket},ϵ::Unitful.Energy,B::Unitful.BField;
     μ::Unitful.Mass=0.5*4.002602u"u")
@@ -100,7 +87,7 @@ function gen_diffB_constk_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Inte
     for γ in l0γs, B in Bs
         E = E∞(γ,k,B)
         println("B=$B, γ=$γ")
-        preexisting=load_data("SmS",E,E,B,B)
+        preexisting=load_data("SmS",E,E,B,B,lmax)
         if length(preexisting)>0 # skip data that has already been generated
             continue
         end
@@ -126,6 +113,19 @@ end
 function test_save_gampwcs(;ϵ=1e-11u"hartree",B=0.01u"T",lmax=0)
     output=σ2γ_output(σ_matrix(ϵ,B,lmax))
     save_gampwcs(output)
+end
+
+# loads, then resaves all files in pairwiseCSfunction; for changing name schemes
+function SmSpwcs_resaver()
+    wd=pwd()
+    cd(SmSpwcs_dir)
+    for f in readdir()
+        load=BSON.load(f)
+        data=σ_output(load[:σ],load[:lookup],load[:ϵ],load[:B],load[:lmax])
+        #rm(f) # delete old file
+        save_SmSpwcs(data) # save new file
+    end
+    cd(wd)
 end
 
 """ loads .SmSpwcs file/s, converts to γ_output and saves as .gampwcs file
@@ -355,18 +355,23 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
                 push!(γdata[2],d.σ[dγ_index,dγ_index]) # store el cross section
             end
         end
-        #TODO sort γdata to have correct B field ordering
         push!(pltdata,γdata)
     end
-    # plot first γ_ket
-    plt=plot(ustrip.(uconvert.(u"T",pltdata[1][1])),austrip.(pltdata[1][2]),xlabel="B (T)",
-    ylabel="σ (a₀²)", yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
-    title="k=$k, lmax=$lmax")
-    if length(pltdata)>1 # plot rest of the γ_kets
-        for i in 2:length(pltdata)
-            plot!(austrip.(uconvert.(u"T",pltdata[i][1])),austrip.(pltdata[i][2]),label=pltlabel[i])
+    # plot S=0
+    S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
+    pltS0=plot(ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
+    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S0index], legend=:outertopright)
+    # plot S=2 states
+    S2indices=filter(x->x!=S0index, 1:length(unq))
+    pltS2=plot(ustrip.(uconvert.(u"T",pltdata[S2indices[1]][1])),austrip.(pltdata[S2indices[1]][2]),
+    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S2indices[1]], legend=:outertopright)
+    if length(S2indices)>1
+        for i=2:length(S2indices)
+            plot!(ustrip.(uconvert.(u"T",pltdata[S2indices[i]][1])),austrip.(pltdata[S2indices[i]][2]),
+            label=pltlabel[S2indices[i]], legend=:outertopright)
         end
     end
-    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
-    plt
+    #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
+    # merge plots
+    plot(pltS0, pltS2, layout=(2,1),title=["k=$k, lmax=$lmax" ""])
 end
