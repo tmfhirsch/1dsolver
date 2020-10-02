@@ -6,7 +6,7 @@ F matrix matches boundary conditions, K matrix matches to bessel functions
 Description last updated 9/09/20=#
 
 module CrossSections
-export σ_output, σ_matrix, γ_output, σ2γ_output
+export S_output, S_matrix, γ_output, S2γ_output, I_output, S2I_output
 
 using HalfIntegers, LinearAlgebra, OrdinaryDiffEq, WignerSymbols
 using Unitful, UnitfulAtomic
@@ -174,20 +174,23 @@ function F_matrix(AL,AR,BL,BR,isOpen; tol_ratio=1e-10)
     F=F[vcat(isOpen,isOpen),:] # taking only open wavefunctions and derivatives
 end
 
-# structure for holding |S₁S₂Smₛlmₗ⟩ cross sections and the inputs that produced them
-struct σ_output
-    σ # the matrix of cross sections
+# structure for holding a |S₁S₂Smₛlmₗ⟩ S matrix and the inputs that produced it
+struct S_output
+    S # the matrix of cross sections
     lookup :: Array{SmS_ket,1}
     ϵ :: Unitful.Energy # energy input
     B :: Unitful.BField # B field strength input
     lmax :: Int # lmax input
+    S_output(S,lookup,ϵ,B,lmax) = size(S)==(length(lookup),length(lookup)) ?
+        new(S,lookup,ϵ,B,lmax) : error("S, lookup size mismatch")
+
 end
 
-""" Calculates matrix of cross sections between γ, only summing over l and mₗ
+""" Calculates S matrix of |S₁S₂Smₛlmₗ⟩ states
     Input: ϵ~[E], B~[Tesla], lmax
-    Output: σ_output containing: σ where σ[i,j]=σ(γ_lookup[j]→γ_lookup[i]),
-    γ_lookup describing the γ_kets involved, ϵ input, B input, lmax input"""
-function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
+    Output: σ_output containing: S where S[i,j]=S(lookup[j]→lookup[i]),
+    lookup describing the kets involved, ϵ input, B input, lmax input"""
+function S_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
     lhs::Unitful.Length, mid::Unitful.Length,
     rhs::Unitful.Length, rrhs::Unitful.Length;
     μ::Unitful.Mass=0.5*4.002602u"u")
@@ -239,10 +242,10 @@ function σ_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
     𝐊 = K_matrix(rrhs,𝐅,𝐤Open,𝐥Open)
     @assert size(𝐊)==(Nₒ,Nₒ) "𝐊 is not Nₒ×Nₒ"  # want sq matrix of Nₒ channels
     𝐒 = (I+im*𝐊)*inv(I-im*𝐊) # Scattering matrix
-    𝐓 = I-𝐒 # transition matrix
-    𝐓sq= abs2.(𝐓) # |Tᵢⱼ|² for use in calculating cross sections
-    return σ_output(𝐓sq,lookup[isOpen],ϵ,B,lmax)
+    return S_output(𝐒, lookup[isOpen], ϵ, B, lmax)
 end
+
+##################γ outputs (cross sections, summing over l, mₗ)#################
 
 # structure for holding |S₁S₂Smₛ⟩ cross sections and the inputs that produced them
 struct γ_output
@@ -251,12 +254,16 @@ struct γ_output
     ϵ :: Unitful.Energy # energy input
     B :: Unitful.BField # B field strength input
     lmax :: Int # lmax input
+    γ_output(σ,γs,ϵ,B,lmax) = size(σ)==(length(γs),length(γs)) ? new(σ,γs,ϵ,B,lmax) :
+        error("σ, γ_lookup size mismatch")
 end
 
-# convert σ_output to γ_output by summing over l,ml numbers
-function σ2γ_output(output::σ_output; μ=0.5*4.002602u"u")
-    σ, lookup, ϵ, B, lmax = output.σ, output.lookup, output.ϵ, output.B, output.lmax
+# convert S_output to γ_output by summing over l,ml numbers
+function S2γ_output(output::S_output; μ=0.5*4.002602u"u")
+    𝐒, lookup, ϵ, B, lmax = output.S, output.lookup, output.ϵ, output.B, output.lmax
     Nₒ=length(lookup)
+    # produce Tsq matrix
+    𝐓=I-𝐒; σ=abs2.(𝐓);
     # initialise γ states used for cross sections
     γ_lookup=unique(γ_ket_convert.(lookup))
     nᵧ=length(γ_lookup)
@@ -281,5 +288,46 @@ function σ2γ_output(output::σ_output; μ=0.5*4.002602u"u")
      end
      return γ_output(σᵧ, γ_lookup, ϵ, B, lmax)
 end
+
+###########################I ouputs, ionisation cross sections##################
+
+struct I_output
+    σ # the cross sections (vector of length γ_lookup)
+    γ_lookup :: Array{γ_ket,1}
+    ϵ :: Unitful.Energy
+    B :: Unitful.BField
+    lmax :: Integer
+    I_output(σ,γs,ϵ,B,lmax) = length(σ)==length(γs) ? new(σ,γs,ϵ,B,lmax) :
+        error("σ, γ_lookup size mismatch")
+end
+
+# converts S_output to I_output by calculating ionisation cross sections
+function S2I_output(output::S_output; μ=0.5*4.002602u"u")
+    𝐒, lookup, ϵ, B, lmax = output.S, output.lookup, output.ϵ, output.B, output.lmax
+    Nₒ=length(lookup)
+    # initialise γ states used for cross sections
+    γ_lookup=unique(γ_ket_convert.(lookup))
+    nᵧ=length(γ_lookup)
+    # create k²ᵧ vector used to calculate cross sections
+    𝐤²ᵧ=let
+        k²(γ::γ_ket)=uconvert(u"bohr^-2",2*μ*(ϵ-H_zee(γ,γ,B))/1u"ħ^2") # only Zeeman at R=∞
+        k².(γ_lookup)
+    end
+    # initialise ionisation cross sections vector
+    σᵢ = zeros(Float64,nᵧ)u"bohr^2"
+    # construct ionisation cross sections vector
+    for i = 1:nᵧ # iterate over γ kets
+        γ=γ_lookup[i]
+        prefactor = π/(𝐤²ᵧ[i]) # π/k²
+        γsum=0 # initialise sum
+        for j = 1:Nₒ # iterate over SmS kets
+            γ_ket_convert(lookup[j])==γ || continue # sums over correct l, mₗ
+            γsum += 1-sum(abs2.(𝐒[:,j])) # nonunitarity for this SmS ket
+        end
+        σᵢ[i]=prefactor*γsum
+    end
+    I_output(σᵢ,γ_lookup,ϵ,B,lmax)
+end
+
 
 end # module
