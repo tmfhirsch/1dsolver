@@ -36,7 +36,7 @@ function plt_H_rot(;lmax=6,Rmin=3e0u"bohr",Rmax=1e6u"bohr",no_R_pts=10000,μ=0.5
 end
 
 # Electronic Interaction plotting
-function plt_H_el(;Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000)
+function plt_H_el(;Rmin=3.0u"bohr",Rmax=20u"bohr",no_R_pts=10000)
     firstS(i::Int)=lookup[findall(x->x.S==i,lookup)[1]] # grabs first state with correct S
     Ss = [firstS(S) for S in 0:2] # prototypical S states
     lab=permutedims((x->"S=$(x.S)").(Ss))
@@ -50,7 +50,7 @@ function plt_H_el(;Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000)
 end
 
 # Electronic and rotational overlaid
-function plt_H_el_and_rot(;lmax=6,Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000,μ=0.5*4.002602u"u")
+function plt_H_el_and_rot(;lmax=6,Rmin=180.0u"bohr",Rmax=220.0u"bohr",no_R_pts=10000,μ=0.5*4.002602u"u")
     firstl(i::Int)=lookup[findall(x->x.l==i,lookup)[1]] # grabs first state with correct l
     ls = [firstl(i) for i in 0:lmax] # prototypical l states
     lab=permutedims((x->"l=$(x.l)").(ls)) # labels
@@ -59,7 +59,7 @@ function plt_H_el_and_rot(;lmax=6,Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000
     Rs=LinRange(Rmin,Rmax,no_R_pts)
     # S=0 plot
     vals0=zeros(length(Rs),length(ls))u"hartree"
-    for i in 1:no_R_pts, j in 1:lmax
+    for i in 1:no_R_pts, j in 1:(lmax+1)
         vals0[i,j]=H_el(Ss[1],Ss[1],Rs[i])+H_rot(ls[j],ls[j],Rs[i],μ)
     end
     lab0=permutedims((x->"l=$(x.l)").(ls))
@@ -67,7 +67,7 @@ function plt_H_el_and_rot(;lmax=6,Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000
     title="S=0")
     # S=1 plot
     vals1=zeros(length(Rs),length(ls))u"hartree"
-    for i in 1:no_R_pts, j in 1:lmax
+    for i in 1:no_R_pts, j in 1:(lmax+1)
         vals1[i,j]=H_el(Ss[2],Ss[2],Rs[i])+H_rot(ls[j],ls[j],Rs[i],μ)
     end
     lab1=permutedims((x->"l=$(x.l)").(ls))
@@ -75,12 +75,13 @@ function plt_H_el_and_rot(;lmax=6,Rmin=3.0u"bohr",Rmax=1e2u"bohr",no_R_pts=10000
     title="S=1")
     # S=2 plot
     vals2=zeros(length(Rs),length(ls))u"hartree"
-    for i in 1:no_R_pts, j in 1:lmax
+    for i in 1:no_R_pts, j in 1:(lmax+1)
         vals2[i,j]=H_el(Ss[3],Ss[3],Rs[i])+H_rot(ls[j],ls[j],Rs[i],μ)
     end
     lab2=permutedims((x->"l=$(x.l)").(ls))
     plt2=plot(austrip.(Rs),austrip.(vals2),label=lab,legend=:outertopright,
     title="S=2")
+    return plot(plt0,plt1,plt2), plt0, plt1, plt2
 end
 
 using ProgressMeter
