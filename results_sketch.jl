@@ -6,6 +6,10 @@ using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots
 using BSON, Dates
 
+using Distributed
+
+const G = 1e-4u"T" # Gauss unit of magnetic flux density
+
 const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
 const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
 const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
@@ -49,7 +53,7 @@ function gen_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
     lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
     Es=exp10.(LinRange(Emin_exp,Emax_exp,n))u"hartree" # energies
     println("lmax=$lmax, B=$B. Generating S_output for E/Eh= ")
-    for E in Es
+    @sync @distributed for E in Es
         println("$(austrip(E)), ")
         output=S_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
         save_output(output)
@@ -65,7 +69,7 @@ function gen_diffB_constE_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Inte
     lhs=lhs,mid=mid,rhs=rhs,rrhs=rrhs)
     Bs=LinRange(Bmin,Bmax,n) # energies
     println("lmax=$lmax, E=$E. Generating σ_output for B/1T= ")
-    for B in Bs
+    @sync @distributed for B in Bs
         println("$(ustrip(uconvert(u"T",B))), ")
         output=S_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
         save_output(output)
@@ -99,15 +103,17 @@ function gen_diffB_constk_data(Bmin::Unitful.BField,Bmax::Unitful.BField,n::Inte
         allγ[findall(x->x.S!=1,allγ)] # no S=1 because zeroing out l>0 states
     end
     println("Generating outputs for k=$k, lmax=$lmax")
-    for γ in l0γs, B in Bs
-        E = E∞(γ,k,B)
-        println("B=$B, γ=$γ")
-        preexisting=load_data("S",E,E,B,B,lmax)
-        if length(preexisting)>0 # skip data that has already been generated
-            continue
+    @sync @distributed for B in Bs
+        for γ in l0γs
+            E = E∞(γ,k,B)
+            println("B=$B, γ=$γ")
+            preexisting=load_data("S",E,E,B,B,lmax)
+            if length(preexisting)>0 # skip data that has already been generated
+                continue
+            end
+            output=S_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
+            save_output(output)
         end
-        output=S_matrix(E,B,lmax,lhs,mid,rhs,rrhs)
-        save_output(output)
     end
 end
 #=
