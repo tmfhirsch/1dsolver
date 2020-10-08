@@ -1,3 +1,4 @@
+#Tested working 8/10/20, git committed in working state
 # sketch for producing artificial Feshbach resonance
 
 using Revise
@@ -20,7 +21,7 @@ const ϵ=1e-8u"hartree"
 const μ=0.5*4.002602u"u"
 
 # parameters for ICs/matching
-const lhs=1e-4*L; const mid=0.75*L; const rhs=(1+1e-3)*L; const rrhs=100*L
+const lhs=1e-5*L; const mid=0.75*L; const rhs=(1+1e-3)*L; const rrhs=100*L
 
 # artificial ket structure
 struct art_ket
@@ -217,10 +218,12 @@ end
 
 
 nec=necessary_C(ϵ)
-Cmin, Cmax, n = 0.9*nec, 1.1*nec, 1000
+#Cmin, Cmax, n = (1-1e-2)*nec, (1+1e-2)*nec, 1000
+Cmin,Cmax,n = -1.34952044e-5u"hartree", -1.34952043e-5u"hartree",10_000
 
 data=diffE_gen_art(Cmin, Cmax, n)
 @assert all(x->length(x.lookup)==1,data) "not all data have 1 open channel"
 Ss=(x->x.S).(data)
 Cs=LinRange(Cmin, Cmax, n)
 plt=plot(austrip.(Cs),angle.(Ss))
+#vline!([austrip(nec)])
