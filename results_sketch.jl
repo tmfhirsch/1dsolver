@@ -10,12 +10,20 @@ using Distributed
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\5-10-20-tests"
+const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\Smat"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\gampwcs"
+const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\Ics"
 
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e4u"bohr"
+
+# convert wavenumber to corresponding temperature by 3/2 kᵦT
+function corresponding_temp(k::typeof(0e0u"bohr^-1");μ=0.5*4.002602u"u")
+    KE=1u"ħ^2"*k^2/(2*μ)
+    T=2/(3u"k_au")*KE
+    uconvert(u"μK",T)
+end
+
 
 # saves pairwise cross section output in ./Smat_dir/, E in Eh and B in T
 function save_output(output::Union{S_output,γ_output,I_output})
@@ -398,8 +406,7 @@ end
 """
     Plot diagonal elements of pairwise σ (i.e. elastic cross sections) vs Bfield
     at constant wavenumber
-Inputs: Bmin~[BField], Bmax~[BField], k~[L]⁻¹ for plot x axis, lmax;
-    Emin~[E]=0Eₕ, Emax~[E]=1Eₕ for finding appropriate data
+Inputs: Bmin~[BField], Bmax~[BField], k~[L]⁻¹ for plot x axis, lmax
 Output: plot of elastic cross sections vs B"""
 function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     k::typeof(0e0u"bohr^-1"),lmax::Integer)
@@ -423,6 +430,7 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
         end
         push!(pltdata,γdata)
     end
+    println("Plotting over $(length(pltdata[1][1])) different B fields")
     # plot S=0
     S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
     pltS0=plot(ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
@@ -439,7 +447,7 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     end
     #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
     # merge plots
-    plot(pltS0, pltS2, layout=(2,1),title=["k=$k, lmax=$lmax" ""])
+    plot(pltS0, pltS2, layout=(2,1),title=["elastic, k=$k, lmax=$lmax" ""])
 end
 
 ###########################Ionisation σ plots###################################
@@ -477,4 +485,50 @@ function diffk_I_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
         end
     end
     plt
+end
+
+"""
+    Plot ionisation σ vs Bfield at constant wavenumber
+Inputs: Bmin~[BField], Bmax~[BField], k~[L]⁻¹ for plot x axis, lmax
+Output: plot of ionisation cross sections vs B"""
+function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
+    k::typeof(0e0u"bohr^-1"),lmax::Integer)
+    # load all data with correct B
+    datas=load_data("I",-(Inf)u"hartree",(Inf)u"hartree",Bmin,Bmax,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.B)) # sort by increasing Bfield
+    unq = unqkets(reverse(datas)) # reverse to find uniques starting with high energy data
+    pltdata=[] # array to store ([B],[σ}) pairs for the different γ
+    pltlabel=label_from_lookup(unq)
+    for γ in unq
+        γdata::typeof(([0.0u"T"],[0.0u"bohr^2"]))=([],[]) # data for this γ
+        for d in datas # already sorted datas by energy
+            if γ in d.γ_lookup # in case γ is closed in this data
+                dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+                # need match of energy to B field for this γ
+                d.ϵ==E∞(γ,k,d.B) || continue
+                push!(γdata[1],d.B) # store Bfield
+                push!(γdata[2],d.σ[dγ_index]) # store ionisation cross section
+            end
+        end
+        push!(pltdata,γdata)
+    end
+    println("Plotting over $(length(pltdata[1][1])) different B fields")
+    # plot S=0
+    S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
+    pltS0=plot(ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
+    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S0index], legend=:outertopright)
+    # plot S=2 states
+    S2indices=filter(x->x!=S0index, 1:length(unq))
+    pltS2=plot(ustrip.(uconvert.(u"T",pltdata[S2indices[1]][1])),austrip.(pltdata[S2indices[1]][2]),
+    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S2indices[1]], legend=:outertopright)
+    if length(S2indices)>1
+        for i=2:length(S2indices)
+            plot!(ustrip.(uconvert.(u"T",pltdata[S2indices[i]][1])),austrip.(pltdata[S2indices[i]][2]),
+            label=pltlabel[S2indices[i]], legend=:outertopright)
+        end
+    end
+    #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
+    # merge plots
+    plot(pltS0, pltS2, layout=(2,1),title=["Ionisation, k=$k, lmax=$lmax" ""])
 end

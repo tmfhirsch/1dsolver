@@ -1,7 +1,7 @@
 # Unit tests. Tested 9/9/20
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Revise
-using CrossSections: solver, K_matrix, F_matrix, σ_matrix
+using CrossSections: solver, K_matrix, F_matrix
 using StateStructures, Interactions
 using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots

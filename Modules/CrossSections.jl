@@ -141,7 +141,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
     return 𝐊
 end
 
-"""Boundary condition matching via SVD
+"""Boundary condition matching via QR decomposition
     Inputs: AL, BCs on LHS;
             AR, wavefunction solution to AL at matching location;
             BL, wavefunction solution to BR at matching location;
