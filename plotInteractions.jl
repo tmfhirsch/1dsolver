@@ -114,6 +114,27 @@ function plt_H_sd_coupling(lmax=20)
     spy(arrᵧ,markersize=15,framestyle=:none,legend=nothing,color=:bwr), arrᵧ, unq
 end
 
+include("./Modules/interactions/H_sd.jl")
+# compare H_sd radial dependence to BO potentials
+function plt_H_sd_radial(;Rmin=3.0u"bohr",Rmax=20u"bohr",no_R_pts=10000)
+    Rs=LinRange(Rmin,Rmax,no_R_pts)
+    # H_el values
+    firstS(i::Int)=lookup[findall(x->x.S==i,lookup)[1]] # grabs first state with correct S
+    Ss = [firstS(S) for S in 0:2] # prototypical S states
+    ellab=permutedims((x->"S=$(x.S)").(Ss))
+    elvals=zeros(length(Rs),length(Ss))u"hartree" #initialse
+    for i in 1:no_R_pts, j in 1:length(0:2)
+        elvals[i,j]=H_el(Ss[j],Ss[j],Rs[i])
+    end
+    # H_sd values
+    SDvals = H_sd_radial.(Rs)
+    lab=hcat(["SD"],ellab)
+    vals=hcat(SDvals,elvals)
+    plot(austrip.(Rs),abs.(austrip.(vals)),yscale=:log10,
+    xlabel="R (a₀)",ylabel="Interaction strength (Eₕ)",
+    labels=lab)
+end
+
 
 """Plot Maxwell Boltzmann distribution vs k, given temp"""
 function plt_MBD(T::Unitful.Temperature; n=1000, μ=0.5*4.002602u"u",

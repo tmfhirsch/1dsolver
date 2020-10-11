@@ -225,5 +225,5 @@ data=diffE_gen_art(Cmin, Cmax, n)
 @assert all(x->length(x.lookup)==1,data) "not all data have 1 open channel"
 Ss=(x->x.S).(data)
 Cs=LinRange(Cmin, Cmax, n)
-plt=plot(austrip.(Cs),angle.(Ss))
+plt=plot(austrip.(Cs),angle.(Ss),yticks=-2π:π:2π)#TODO y scale in units of pi
 #vline!([austrip(nec)])

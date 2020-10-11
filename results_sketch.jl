@@ -10,12 +10,12 @@ using Distributed
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\Smat"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\gampwcs"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsA\Ics"
+const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\Smat"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\gampwcs"
+const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\Ics"
 
 # parameters for ICs/matching
-const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e4u"bohr"
+const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
 
 # convert wavenumber to corresponding temperature by 3/2 kᵦT
 function corresponding_temp(k::typeof(0e0u"bohr^-1");μ=0.5*4.002602u"u")
