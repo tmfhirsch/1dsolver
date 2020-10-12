@@ -10,9 +10,9 @@ using Distributed
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\Smat"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\gampwcs"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\11-10-20-tests\Ics"
+const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\Smat"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\gampwcs"
+const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\Ics"
 
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
@@ -455,7 +455,7 @@ end
 function diffk_I_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     B::Unitful.BField, lmax::Integer)
     # load all data with correct B
-    datas=load_data("gam",-(Inf)u"hartree",(Inf)u"hartree",B,B,lmax)
+    datas=load_data("I",-(Inf)u"hartree",(Inf)u"hartree",B,B,lmax)
     @assert length(datas)>0 "Didn't find any suitable data"
     sort!(datas, by=(x->x.ϵ)) # sort by increasing energy
     unq = unqkets(reverse(datas)) # reverse to find uniques starting with high energy data

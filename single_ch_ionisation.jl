@@ -12,10 +12,6 @@ using Interactions, StateStructures
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\single_ch_ionisation\Smat"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\single_ch_ionisation\gampwcs"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\single_ch_ionisation\Ics"
-
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
 
