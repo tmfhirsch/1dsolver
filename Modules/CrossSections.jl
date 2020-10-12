@@ -97,7 +97,7 @@ function solver(lookup, IC, ϵ, lhs, rhs; B=0.0u"T", μ=0.5*4.002602u"u")
     callback=callback) #TODO added save_start 22/9/20, need to test for lmax>0
     # add units back
     units = vcat(fill(1.0u"bohr",n),fill(1.0,n))
-    sol = x -> sol_unitless(austrip(x)).*units
+    sol = x -> sol_unitless(austrip(x)).*units # TODO see notes 12/10
     return sol
 end
 
@@ -134,7 +134,7 @@ function K_matrix(R, 𝐅, 𝐤, 𝐥)
         bn⁻=austrip(sqrt(k))*((l+1)*sphericalbessely(l,k*R)
             -k*R*sphericalbessely(l+1,k*R))
         Gᵢⱼ, G⁻ᵢⱼ = G[i,j], G⁻[i,j]
-        AB = [bj -bn; bj⁻ -bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] # AB≡[Aᵢⱼ; Bᵢⱼ], solve J;-N*AB=G;G⁻
+        AB = [bj bn; bj⁻ bn⁻]\[Gᵢⱼ; G⁻ᵢⱼ] #12/10 removed minus sign on 𝐍 # AB≡[Aᵢⱼ; Bᵢⱼ], solve J;-N*AB=G;G⁻
         A[i,j], B[i,j] = AB
     end
     𝐊 = B*inv(A)
