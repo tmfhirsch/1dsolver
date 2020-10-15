@@ -3,16 +3,16 @@ using Revise
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using CrossSections, StateStructures, Interactions
 using Unitful, UnitfulAtomic, LinearAlgebra
-using Plots
+using Plots, Plots.PlotMeasures
 using BSON, Dates
 
 using Distributed
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\Smat"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\gampwcs"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\12-10-20-tests\Ics"
+const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\Smat"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\gampwcs"
+const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\Ics"
 
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
@@ -229,7 +229,7 @@ end
 
 ###################################Load data####################################
 """ load .Smat data with filenames fitting bounds on E, B, lmax
-    Inputs: flag∈{"S","gam"}, Emin/max ~[E], Bmin/max ~ [Tesla], lmax
+    Inputs: flag∈{"S","gam","I"}, Emin/max ~[E], Bmin/max ~ [Tesla], lmax
     Output: array of outputs found from filename filtering"""
 function load_data(flag::String,Emin::Unitful.Energy,Emax::Unitful.Energy,
     Bmin::Unitful.BField,Bmax::Unitful.BField,lmax::Integer)
@@ -353,7 +353,9 @@ function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BFi
     end
     plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Energy (Eh)", xscale=:log10,
     ylabel="σ (a₀²)",yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
-    title="B=$B, lmax=$lmax")
+    title="B=$B, lmax=$lmax",
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,
+    linewidth=2,grid=false)
     if length(pltdata)>1 # plot rest of the γ_ket series
         for i in 2:length(pltdata)
             plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
@@ -393,7 +395,9 @@ function diffk_gam_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     # plot first γ_ket
     plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Wavenumber (a₀⁻¹)", xscale=:log10,
     ylabel="σ (a₀²)",yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
-    title="B=$B, lmax=$lmax")
+    title="B=$B, lmax=$lmax",
+    left_margin=5mm,bottom_margin=5mm, top_margin=5mm,
+    linewidth=2, grid=false)
     if length(pltdata)>1 # plot rest of the γ_kets
         for i in 2:length(pltdata)
             plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
@@ -447,7 +451,8 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     end
     #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
     # merge plots
-    plot(pltS0, pltS2, layout=(2,1),title=["elastic, k=$k, lmax=$lmax" ""])
+    plot(pltS0, pltS2, layout=(2,1),title=["elastic, k=$k, lmax=$lmax" ""],
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)
 end
 
 ###########################Ionisation σ plots###################################
@@ -478,7 +483,9 @@ function diffk_I_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     # plot first γ_ket
     plt=plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Wavenumber (a₀⁻¹)", xscale=:log10,
     ylabel="σ(PI) (a₀²)", minorticks=true, label=pltlabel[1], legend=:outertopright,
-    title="B=$B, lmax=$lmax")
+    title="B=$B, lmax=$lmax",
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,
+    linewidth=2,grid=false)
     if length(pltdata)>1 # plot rest of the γ_kets
         for i in 2:length(pltdata)
             plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
@@ -530,5 +537,6 @@ function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     end
     #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
     # merge plots
-    plot(pltS0, pltS2, layout=(2,1),title=["Ionisation, k=$k, lmax=$lmax" ""])
+    plot(pltS0, pltS2, layout=(2,1),title=["Ionisation, k=$k, lmax=$lmax" ""],
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)
 end

@@ -4,13 +4,14 @@
 using Revise
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Unitful, UnitfulAtomic, LinearAlgebra
-using Plots
+using Plots, Plots.PlotMeasures
 
 using CrossSections: F_matrix, K_matrix, solver
 using OrdinaryDiffEq
 using Interactions, StateStructures
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
+const μ=0.5*4.002602u"u"
 
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
@@ -97,8 +98,8 @@ function sin_S_matrix(ϵ::Unitful.Energy,B::Unitful.BField,lmax::Int,
         k²(a::SmS_ket)=uconvert(u"bohr^-2",2*μ*(ϵ-H_zee(a,a,B))/1u"ħ^2") # only Zeeman at R=∞
         k².(lookup)
     end
-    σT = [π/sqrt(𝐤²[i])*abs2(𝐒[i]) for i in 1:length(lookup)]
-    σPI = [π/sqrt(𝐤²[i])*(1-abs2(𝐒[i])) for i in 1:length(lookup)]
+    σT = [π/𝐤²[i]*abs2(𝐒[i]) for i in 1:length(lookup)]
+    σPI = [π/𝐤²[i]*(1-abs2(𝐒[i])) for i in 1:length(lookup)]
     return sin_output(𝐒, σT, σPI, lookup[isOpen], ϵ, B)
 end
 
@@ -117,8 +118,19 @@ function sin_diffE_data(Emin_exp,Emax_exp,n::Integer,lmax::Integer;B=0u"T",
 end
 
 
-Emin, Emax = -12, -8; n=10; B=0u"T"
+Emin, Emax = -12, -8; n=50; B=0u"T"
 
 data=sin_diffE_data(Emin, Emax, n, 0)
 @assert all(x->length(x.lookup)==1,data) "not all data have 1 open channel"
 Es, Ts, Is = (x->x.ϵ).(data), (x->x.T[1]).(data), (x->x.I[1]).(data)
+ks = auconvert.((x->sqrt(2*μ*x)/1u"ħ").(Es))
+vs = uconvert.(u"bohr/s",(1u"ħ"/μ).*ks)
+
+kIplt=plot(ustrip.(ks),ustrip.(Is),yscale=:log10,xscale=:log10,
+    xlabel="k (a₀⁻¹)", ylabel="σ (a₀²)",
+    linewidth=2,legend=false,grid=false,
+    left_margin=5mm,bottom_margin=5mm)
+kRplt=plot(ustrip.(ks),ustrip.(uconvert.(u"bohr^3/s",vs.*Is))./1e15,xscale=:log10,#yscale=:log10,
+    xlabel="k (a₀⁻¹)", ylabel="σv (10¹⁵ a₀³ s⁻¹)",
+    linewidth=2,legend=false,grid=false,
+    left_margin=5mm,bottom_margin=5mm)
