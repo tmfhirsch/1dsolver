@@ -4,7 +4,7 @@
 using Revise
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using Unitful, UnitfulAtomic, LinearAlgebra
-using Plots
+using Plots, Plots.PlotMeasures
 using BSON, Dates
 
 using CrossSections: F_matrix, K_matrix
@@ -216,14 +216,23 @@ function diffE_gen_art(Cmin::Unitful.Energy, Cmax::Unitful.Energy, n::Integer)
     data
 end
 
-
 nec=necessary_C(ϵ)
 #Cmin, Cmax, n = (1-1e-2)*nec, (1+1e-2)*nec, 1000
-Cmin,Cmax,n = -1.34952044e-5u"hartree", -1.34952043e-5u"hartree",10_000
+n=10_000
+Ctarget = -1.3495204361066107e-5u"hartree"
+Cmin,Cmax = Ctarget-1e-12u"hartree",Ctarget+1e-12u"hartree"
 
 data=diffE_gen_art(Cmin, Cmax, n)
 @assert all(x->length(x.lookup)==1,data) "not all data have 1 open channel"
 Ss=(x->x.S).(data)
 Cs=LinRange(Cmin, Cmax, n)
-plt=plot(austrip.(Cs),angle.(Ss),yticks=-2π:π:2π)#TODO y scale in units of pi
+Ps=angle.(Ss)./2 # phases #S = exp(2iδₗ)
+maxindex=findmax(Ps)[2]
+plt=plot(austrip.(Cs.-Ctarget),Ps,yticks=-π:π:π,
+    grid=false,legend=false,
+    bottom_margin=5mm,left_margin=5mm,top_margin=5mm,
+    xlabel="C - C₀ (Eh)", ylabel="Phaseshift (rad)",
+    title="C₀=$Ctarget")
 #vline!([austrip(nec)])
+
+bound_n=austrip(sqrt(2*μ*(ϵ-Ctarget))*L/(π*1u"ħ"))

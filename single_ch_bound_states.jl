@@ -137,7 +137,7 @@ function numcrossings(S::Int, l::Int, ϵ::Unitful.Energy)
     return crossings
 end
 
-####################Script work###################################3
+####################Script work#################################################
 function sketch()
     l=2; S=2
     ϵ=-7.044e-5u"hartree"; δϵ=1e-10u"hartree"

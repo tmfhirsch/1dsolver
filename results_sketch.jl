@@ -5,6 +5,7 @@ using CrossSections, StateStructures, Interactions
 using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots, Plots.PlotMeasures
 using BSON, Dates
+using Statistics
 
 using Distributed
 
@@ -23,7 +24,6 @@ function corresponding_temp(k::typeof(0e0u"bohr^-1");μ=0.5*4.002602u"u")
     T=2/(3u"k_au")*KE
     uconvert(u"μK",T)
 end
-
 
 # saves pairwise cross section output in ./Smat_dir/, E in Eh and B in T
 function save_output(output::Union{S_output,γ_output,I_output})
@@ -406,7 +406,6 @@ function diffk_gam_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
 end
 
-
 """
     Plot diagonal elements of pairwise σ (i.e. elastic cross sections) vs Bfield
     at constant wavenumber
@@ -434,15 +433,64 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
         end
         push!(pltdata,γdata)
     end
+    #=# for plotting individual mS states
+    target_mS=2
+    msindex=findall(x->x.S==2&&x.mS==target_mS,unq)[1]
+    baseline_σ=median(austrip.(pltdata[msindex][2]))
+    target_plt=plot(ustrip.(uconvert.(u"T",pltdata[msindex][1])),austrip.(pltdata[msindex][2]),
+    ylabel="σ (a₀²)", xlabel="B (T)", title="elastic, |S=2, mₛ=$(target_mS)⟩",
+    ylims=(baseline_σ-10,baseline_σ+10))
+    target_plt=#
+    # for plotting each channel in a subplot
     println("Plotting over $(length(pltdata[1][1])) different B fields")
     # plot S=0
     S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
-    pltS0=plot(ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
-    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S0index], legend=:outertopright)
-    # plot S=2 states
+    S0base=median(austrip.(pltdata[S0index][2]))
+    pltS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
+    minorticks=true, label=pltlabel[S0index], legend=:outertopright,
+    xlabel="B (G)", ylabel="σ (a₀²)",
+    ylims=(S0base-10,S0base+10))
+    #plot S=2,mS=-2
+    S2mSm2index = findall(x->x.S==2&&x.mS==-2,unq)[1] # index of the S=2,mS=-2 ket
+    S2mSm2base=median(austrip.(pltdata[S2mSm2index][2]))
+    pltS2mSm2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm2index][1])),austrip.(pltdata[S2mSm2index][2]),
+    minorticks=true, label=pltlabel[S2mSm2index], legend=:outertopright,
+    xlabel="B (G)", ylabel="σ (a₀²)",
+    ylims=(S2mSm2base-1000,S2mSm2base+1000))
+    # plot S=2,mS=-1
+    S2mSm1index = findall(x->x.S==2&&x.mS==-1,unq)[1] # index of the S=2,mS=-2 ket
+    S2mSm1base=median(austrip.(pltdata[S2mSm1index][2]))
+    pltS2mSm1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm1index][1])),austrip.(pltdata[S2mSm1index][2]),
+    minorticks=true, label=pltlabel[S2mSm1index], legend=:outertopright,
+    ylabel="σ (a₀²)", xlabel="B (G)",
+    ylims=(S2mSm1base-1000,S2mSm1base+1000))
+    # plot S=2,mS=0
+    S2mS0index = findall(x->x.S==2&&x.mS==0,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS0base=median(austrip.(pltdata[S2mS0index][2]))
+    pltS2mS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS0index][1])),austrip.(pltdata[S2mS0index][2]),
+    minorticks=true, label=pltlabel[S2mS0index], legend=:outertopright,
+    ylabel="σ (a₀²)", xlabel="B (G)",
+    ylims=(S2mS0base-1000,S2mS0base+1000))
+    # plot S=2,mS=1
+    S2mS1index = findall(x->x.S==2&&x.mS==1,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS1base=median(austrip.(pltdata[S2mS1index][2]))
+    pltS2mS1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS1index][1])),austrip.(pltdata[S2mS1index][2]),
+    minorticks=true, label=pltlabel[S2mS1index], legend=:outertopright,
+    ylabel="σ (a₀²)", xlabel="B (G)",
+    ylims=(S2mS1base-1000,S2mS1base+1000))
+    # plot S=2,mS=2
+    S2mS2index = findall(x->x.S==2&&x.mS==2,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS2base=median(austrip.(pltdata[S2mS2index][2]))
+    pltS2mS2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS2index][1])),austrip.(pltdata[S2mS2index][2]),
+    minorticks=true, label=pltlabel[S2mS2index], legend=:outertopright,
+    ylabel="σ (a₀²)", xlabel="B (G)",
+    ylims=(S2mS2base-1000,S2mS2base+1000))
+    return pltS0, pltS2mSm2, pltS2mSm1, pltS2mS0, pltS2mS1, pltS2mS2
+    #=# for plotting S=2 on top of each other
     S2indices=filter(x->x!=S0index, 1:length(unq))
     pltS2=plot(ustrip.(uconvert.(u"T",pltdata[S2indices[1]][1])),austrip.(pltdata[S2indices[1]][2]),
-    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S2indices[1]], legend=:outertopright)
+    xlabel="B (T)", ylabel="σ (a₀²)", minorticks=true, label=pltlabel[S2indices[1]], legend=:outertopright,
+    ylims=(252000,261000))
     if length(S2indices)>1
         for i=2:length(S2indices)
             plot!(ustrip.(uconvert.(u"T",pltdata[S2indices[i]][1])),austrip.(pltdata[S2indices[i]][2]),
@@ -452,7 +500,7 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
     # merge plots
     plot(pltS0, pltS2, layout=(2,1),title=["elastic, k=$k, lmax=$lmax" ""],
-    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)=#
 end
 
 ###########################Ionisation σ plots###################################
@@ -485,7 +533,8 @@ function diffk_I_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
     ylabel="σ(PI) (a₀²)", minorticks=true, label=pltlabel[1], legend=:outertopright,
     title="B=$B, lmax=$lmax",
     left_margin=5mm,bottom_margin=5mm,top_margin=5mm,
-    linewidth=2,grid=false)
+    linewidth=2,grid=false,
+    yscale=:log10)
     if length(pltdata)>1 # plot rest of the γ_kets
         for i in 2:length(pltdata)
             plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
@@ -521,6 +570,53 @@ function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
         push!(pltdata,γdata)
     end
     println("Plotting over $(length(pltdata[1][1])) different B fields")
+    # for plotting all individually
+    # for plotting each channel in a subplot
+    println("Plotting over $(length(pltdata[1][1])) different B fields")
+    # plot S=0
+    S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
+    S0base=median(austrip.(pltdata[S0index][2]))
+    pltS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
+    minorticks=true, label=pltlabel[S0index], legend=:outertopright,
+    xlabel="B (G)", ylabel="σ(PI) (a₀²)",
+    ylims=(S0base-2000,S0base+2000))
+    #plot S=2,mS=-2
+    S2mSm2index = findall(x->x.S==2&&x.mS==-2,unq)[1] # index of the S=2,mS=-2 ket
+    S2mSm2base=median(austrip.(pltdata[S2mSm2index][2]))
+    pltS2mSm2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm2index][1])),austrip.(pltdata[S2mSm2index][2]),
+    minorticks=true, label=pltlabel[S2mSm2index], legend=:outertopright,
+    xlabel="B (G)", ylabel="σ(PI) (a₀²)",
+    ylims=(-10,1000))
+    # plot S=2,mS=-1
+    S2mSm1index = findall(x->x.S==2&&x.mS==-1,unq)[1] # index of the S=2,mS=-2 ket
+    S2mSm1base=median(austrip.(pltdata[S2mSm1index][2]))
+    pltS2mSm1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm1index][1])),austrip.(pltdata[S2mSm1index][2]),
+    minorticks=true, label=pltlabel[S2mSm1index], legend=:outertopright,
+    ylabel="σ(PI) (a₀²)", xlabel="B (G)",
+    ylims=(-10,1000))
+    # plot S=2,mS=0
+    S2mS0index = findall(x->x.S==2&&x.mS==0,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS0base=median(austrip.(pltdata[S2mS0index][2]))
+    pltS2mS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS0index][1])),austrip.(pltdata[S2mS0index][2]),
+    minorticks=true, label=pltlabel[S2mS0index], legend=:outertopright,
+    ylabel="σ(PI) (a₀²)", xlabel="B (G)",
+    ylims=(-Inf,100))
+    # plot S=2,mS=1
+    S2mS1index = findall(x->x.S==2&&x.mS==1,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS1base=median(austrip.(pltdata[S2mS1index][2]))
+    pltS2mS1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS1index][1])),austrip.(pltdata[S2mS1index][2]),
+    minorticks=true, label=pltlabel[S2mS1index], legend=:outertopright,
+    ylabel="σ(PI) (a₀²)", xlabel="B (G)",
+    ylims=(-10,100))
+    # plot S=2,mS=2
+    S2mS2index = findall(x->x.S==2&&x.mS==2,unq)[1] # index of the S=2,mS=-2 ket
+    S2mS2base=median(austrip.(pltdata[S2mS2index][2]))
+    pltS2mS2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS2index][1])),austrip.(pltdata[S2mS2index][2]),
+    minorticks=true, label=pltlabel[S2mS2index], legend=:outertopright,
+    ylabel="σ(PI) (a₀²)", xlabel="B (G)",
+    ylims=(-10,100))
+    return pltS0, pltS2mSm2, pltS2mSm1, pltS2mS0, pltS2mS1, pltS2mS2
+    #=# for plotting S=0 and S=2 separately
     # plot S=0
     S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
     pltS0=plot(ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
@@ -538,5 +634,40 @@ function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     #hline!([4*pi*austrip((7.54u"nm")^2)],label="4π×(7.54nm)²") # S=2 theoretical σ
     # merge plots
     plot(pltS0, pltS2, layout=(2,1),title=["Ionisation, k=$k, lmax=$lmax" ""],
-    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)
+    left_margin=5mm,bottom_margin=5mm,top_margin=5mm,linewidth=2,grid=false)=#
+end
+
+########################Fano fitting############################################
+using LsqFit
+""" Returns least squares fit of Fano profile to elastic cross section data,
+    given a state γ, wavenumber k, and lmax (along with Bmin, Bmax fitting region)"""
+function fit_fano(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
+    k::Union{typeof(0u"bohr^-1"),typeof(0e0u"bohr^-1")},lmax::Int)
+    # load all data with correct B
+    datas=load_data("gam",-(Inf)u"hartree",(Inf)u"hartree",Bmin,Bmax,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.B)) # sort by increasing Bfield
+    Bs::Array{Unitful.BField,1}=[]
+    σs::Array{typeof(0e0u"bohr^2"),1}=[]
+    for d in datas # already sorted datas by energy
+        if γ in d.γ_lookup # in case γ is closed in this data
+            dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+            # need match of energy to B field for this γ
+            d.ϵ==E∞(γ,k,d.B) || continue
+            push!(Bs,d.B) # store Bfield
+            push!(σs,d.σ[dγ_index,dγ_index]) # store elastic cross section
+        end
+    end
+    #p[1≡q, p[2]≡Δ, p[3]≡B₀
+    @. fano(𝐱, p) = (p[1]*p[2]/2+𝐱-p[3])^2/((p[2]/2)^2+(𝐱-p[3])^2) # Fano eqn
+    # strip units before passing to fit
+    Bs⁰=ustrip.(uconvert.(u"T",Bs)*10_000) # Bfields in G so Δ, B₀ in G
+    σs⁰=austrip.(σs) # σ in a₀²
+    # parameter starting points
+    lb = [-Inf,0.0,125.0] # lower bounds
+    ub = [Inf,10.0,130.0]# upper bounds
+    q0=2.0; Δ0=1.0; B0=125.0 # Best guess (B field stuff in G)
+    p0=[q0,Δ0,B0] # initial parameters choice
+    fit = curve_fit(fano,Bs⁰,σs⁰,p0,lower=lb,upper=ub)
+    return fit, Bs⁰, σs⁰, fano(Bs⁰, coef(fit))
 end

@@ -6,7 +6,7 @@ using Revise
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using StateStructures, Interactions
 using Unitful, UnitfulAtomic, LinearAlgebra
-using Plots
+using Plots, Plots.PlotMeasures
 using BSON, Dates
 
 const lmaxx=20 # more than enough states to be relevant to my calculations
@@ -32,7 +32,9 @@ function plt_H_rot(;lmax=6,Rmin=3e0u"bohr",Rmax=1e6u"bohr",no_R_pts=10000,μ=0.5
         vals[i,j]=H_rot(ls[j],ls[j],Rs[i],μ)
     end
     plt=plot(austrip.(Rs),austrip.(vals),xscale=:log10,yscale=:log10,
-    xlabel="R (a₀)", ylabel="Hᵣₒₜ(l,R) (Eₕ)",label=lab,legend=:outertopright)
+    xlabel="R (a₀)", ylabel="Hᵣₒₜ(l,R) (Eₕ)",label=lab,legend=:outertopright,
+    bottom_margin=5mm,left_margin=5mm, grid=false,
+    yticks=exp10.(-15:3:-3))
 end
 
 # Electronic Interaction plotting
