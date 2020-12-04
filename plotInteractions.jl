@@ -5,6 +5,7 @@
 using Revise
 push!(LOAD_PATH,raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Code\1dsolver\Modules")
 using StateStructures, Interactions
+using WignerSymbols, Wigner9j
 using Unitful, UnitfulAtomic, LinearAlgebra
 using Plots, Plots.PlotMeasures
 using BSON, Dates
@@ -109,7 +110,7 @@ function plt_H_sd_coupling(lmax=20)
             next!(prog)
             γ_ket_convert(lookup[p])==γ || continue
             γ_ket_convert(lookup[q])==γ_ || continue
-            sum += H_sd_coeffs(lookup[p],lookup[q])
+            sum += abs(H_sd_coeffs(lookup[p],lookup[q]))
         end
         arrᵧ[i+1,j+1] = sum
     end

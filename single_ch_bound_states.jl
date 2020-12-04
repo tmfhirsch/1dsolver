@@ -128,27 +128,37 @@ function numcrossings(S::Int, l::Int, ϵ::Unitful.Energy)
     # finished checks
     lookup = [filter(x->(x.S==S && x.l == l), SmS_lookup_generator(l))[1]]
     IC = [0e0u"bohr"; 1e0]
-    lhs, rhs = lhsrhs(lookup[1],ϵ)
+    #lhs, rhs = lhsrhs(lookup[1],ϵ)
+    lhs,rhs=3e0u"bohr",2e2u"bohr" # TODO changed 25/10 as a test
     sol=sng_solver(lookup, IC, ϵ, lhs, rhs)
+    #gridlhs,gridrhs=lhsrhs(lookup[1],ϵ)
     grid=LinRange(lhs,rhs,num)
     ψvals=getindex.(sol.(grid), 1)
     crossings=count(ψvals[1:end-1].*ψvals[2:end].<0u"bohr^2")
-    #plt=plot(ustrip.(grid),ustrip.(ψvals)) plot of wavefunction
+    #println(crossings)
+    #println(crossings)
+    #plt=plot(ustrip.(grid),ustrip.(ψvals)) #plot of wavefunction
     return crossings
 end
 
 ####################Script work#################################################
 function sketch()
-    l=2; S=2
-    ϵ=-7.044e-5u"hartree"; δϵ=1e-10u"hartree"
-    while numcrossings(S,l,ϵ)==12
+    l=0; S=0
+    ϵ=-4.11e-6u"hartree"; δϵ=1e-8u"hartree"
+    println(numcrossings(S,l,ϵ))
+    while numcrossings(S,l,ϵ)==14
         println(ϵ)
         ϵ-=δϵ
     end
     println(ϵ)
 end
 
-# S=0, l=2 has 27 crossings at 0 energy; S=2, l=2 has 14
+# S=0, l=2 has 27 crossings at 0 energy;
+# S=2, l=2 has 14;
+# S=2, l=0 has 14
+# S=2, l=2 has 14
 # manually entering values into here # 1e-10 Eₕ precision
 S0l2_bstate_en=[-6.7031e-6u"hartree",-4.20576e-5u"hartree",-1.273626e-4u"hartree"]
 S2l2_bstate_en=[-1.0794e-6u"hartree",-1.87529e-5u"hartree",-7.04485e-5u"hartree"]
+S2l0_bstate_en=[-2.19269e-6u"hartree",-2.154e-5u"hartree"]
+S2l2_bstate_en=[-4.154671e-6u"hartree"]

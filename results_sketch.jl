@@ -11,9 +11,9 @@ using Distributed
 
 const G = 1e-4u"T" # Gauss unit of magnetic flux density
 
-const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\Smat"
-const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\gampwcs"
-const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\resultsC\Ics"
+const Smat_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\zeroB\Smat"
+const gampwcs_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\zeroB\gampwcs"
+const Ics_dir=raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Results\zeroB\Ics"
 
 # parameters for ICs/matching
 const lhs=3e0u"bohr"; const mid=5e1u"bohr"; const rhs=2e2u"bohr"; const rrhs=1e3u"bohr"
@@ -358,10 +358,11 @@ function diffE_gam_plot(Emin::Unitful.Energy,Emax::Unitful.Energy,B::Unitful.BFi
     linewidth=2,grid=false)
     if length(pltdata)>1 # plot rest of the γ_ket series
         for i in 2:length(pltdata)
-            plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i])
+            plot!(austrip.(pltdata[i][1]),austrip.(pltdata[i][2]),label=pltlabel[i],
+            linewidth=2)
         end
     end
-    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²")
+    hline!([4*pi*austrip((7.54u"nm")^2)],label="S=2 4πa²", linewidth=2)
 end
 
 """
@@ -385,13 +386,16 @@ function diffk_gam_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
                 dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
                 k=k∞(γ,d.ϵ,B) # the asymptotic wavenumber for this particular data
                 imag(k)==0.0u"bohr^-1" || continue # don't store if the wavenumber is complex⟺channel closed
-                kmin < real(k) < kmax || continue # don't store if the wavenumber is out of bounds
+                kmin <= real(k) <= kmax || continue # don't store if the wavenumber is out of bounds
                 push!(datatuple[1],k) # store wavenumber
                 push!(datatuple[2],d.σ[dγ_index,dγ_index]) # store cross section
             end
         end
         push!(pltdata,datatuple)
     end
+    println("Minimum values are:")
+    println("S, mS = ",(x->"$(x.S), $(x.mS)").(unq))
+    println(austrip.([pltdata[i][2][1] for i=1:length(pltdata)]))
     # plot first γ_ket
     plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Wavenumber (a₀⁻¹)", xscale=:log10,
     ylabel="σ (a₀²)",yscale=:log10, minorticks=true, label=pltlabel[1], legend=:outertopright,
@@ -447,42 +451,42 @@ function diffB_gam_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
     S0base=median(austrip.(pltdata[S0index][2]))
     pltS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
-    minorticks=true, label=pltlabel[S0index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S0index],legend=false,
     xlabel="B (G)", ylabel="σ (a₀²)",
     ylims=(S0base-10,S0base+10))
     #plot S=2,mS=-2
     S2mSm2index = findall(x->x.S==2&&x.mS==-2,unq)[1] # index of the S=2,mS=-2 ket
     S2mSm2base=median(austrip.(pltdata[S2mSm2index][2]))
     pltS2mSm2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm2index][1])),austrip.(pltdata[S2mSm2index][2]),
-    minorticks=true, label=pltlabel[S2mSm2index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mSm2index],legend=false,
     xlabel="B (G)", ylabel="σ (a₀²)",
     ylims=(S2mSm2base-1000,S2mSm2base+1000))
     # plot S=2,mS=-1
     S2mSm1index = findall(x->x.S==2&&x.mS==-1,unq)[1] # index of the S=2,mS=-2 ket
     S2mSm1base=median(austrip.(pltdata[S2mSm1index][2]))
     pltS2mSm1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm1index][1])),austrip.(pltdata[S2mSm1index][2]),
-    minorticks=true, label=pltlabel[S2mSm1index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mSm1index],legend=false,
     ylabel="σ (a₀²)", xlabel="B (G)",
     ylims=(S2mSm1base-1000,S2mSm1base+1000))
     # plot S=2,mS=0
     S2mS0index = findall(x->x.S==2&&x.mS==0,unq)[1] # index of the S=2,mS=-2 ket
     S2mS0base=median(austrip.(pltdata[S2mS0index][2]))
     pltS2mS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS0index][1])),austrip.(pltdata[S2mS0index][2]),
-    minorticks=true, label=pltlabel[S2mS0index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS0index],legend=false,
     ylabel="σ (a₀²)", xlabel="B (G)",
     ylims=(S2mS0base-1000,S2mS0base+1000))
     # plot S=2,mS=1
     S2mS1index = findall(x->x.S==2&&x.mS==1,unq)[1] # index of the S=2,mS=-2 ket
     S2mS1base=median(austrip.(pltdata[S2mS1index][2]))
     pltS2mS1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS1index][1])),austrip.(pltdata[S2mS1index][2]),
-    minorticks=true, label=pltlabel[S2mS1index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS1index],legend=false,
     ylabel="σ (a₀²)", xlabel="B (G)",
     ylims=(S2mS1base-1000,S2mS1base+1000))
     # plot S=2,mS=2
     S2mS2index = findall(x->x.S==2&&x.mS==2,unq)[1] # index of the S=2,mS=-2 ket
     S2mS2base=median(austrip.(pltdata[S2mS2index][2]))
     pltS2mS2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS2index][1])),austrip.(pltdata[S2mS2index][2]),
-    minorticks=true, label=pltlabel[S2mS2index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS2index],legend=false,
     ylabel="σ (a₀²)", xlabel="B (G)",
     ylims=(S2mS2base-1000,S2mS2base+1000))
     return pltS0, pltS2mSm2, pltS2mSm1, pltS2mS0, pltS2mS1, pltS2mS2
@@ -521,13 +525,16 @@ function diffk_I_plot(kmin::typeof(0e0u"bohr^-1"),kmax::typeof(0e0u"bohr^-1"),
                 dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
                 k=k∞(γ,d.ϵ,B) # the asymptotic wavenumber for this particular data
                 imag(k)==0.0u"bohr^-1" || continue # don't store if the wavenumber is complex⟺channel closed
-                kmin < real(k) < kmax || continue # don't store if the wavenumber is out of bounds
+                kmin <= real(k) <= kmax || continue # don't store if the wavenumber is out of bounds
                 push!(datatuple[1],k) # store wavenumber
                 push!(datatuple[2],d.σ[dγ_index]) # store cross section
             end
         end
         push!(pltdata,datatuple)
     end
+    println("Minimum values are:")
+    println("S, mS = ",(x->"$(x.S), $(x.mS)").(unq))
+    println(austrip.([pltdata[i][2][1] for i=1:length(pltdata)]))
     # plot first γ_ket
     plt=plot(austrip.(pltdata[1][1]),austrip.(pltdata[1][2]),xlabel="Wavenumber (a₀⁻¹)", xscale=:log10,
     ylabel="σ(PI) (a₀²)", minorticks=true, label=pltlabel[1], legend=:outertopright,
@@ -577,42 +584,42 @@ function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
     S0index = findall(x->x.S==0,unq)[1] # index of the S=0 ket
     S0base=median(austrip.(pltdata[S0index][2]))
     pltS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S0index][1])),austrip.(pltdata[S0index][2]),
-    minorticks=true, label=pltlabel[S0index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S0index], legend=false,
     xlabel="B (G)", ylabel="σ(PI) (a₀²)",
     ylims=(S0base-2000,S0base+2000))
     #plot S=2,mS=-2
     S2mSm2index = findall(x->x.S==2&&x.mS==-2,unq)[1] # index of the S=2,mS=-2 ket
     S2mSm2base=median(austrip.(pltdata[S2mSm2index][2]))
     pltS2mSm2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm2index][1])),austrip.(pltdata[S2mSm2index][2]),
-    minorticks=true, label=pltlabel[S2mSm2index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mSm2index], legend=false,
     xlabel="B (G)", ylabel="σ(PI) (a₀²)",
     ylims=(-10,1000))
     # plot S=2,mS=-1
     S2mSm1index = findall(x->x.S==2&&x.mS==-1,unq)[1] # index of the S=2,mS=-2 ket
     S2mSm1base=median(austrip.(pltdata[S2mSm1index][2]))
     pltS2mSm1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mSm1index][1])),austrip.(pltdata[S2mSm1index][2]),
-    minorticks=true, label=pltlabel[S2mSm1index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mSm1index], legend=false,
     ylabel="σ(PI) (a₀²)", xlabel="B (G)",
     ylims=(-10,1000))
     # plot S=2,mS=0
     S2mS0index = findall(x->x.S==2&&x.mS==0,unq)[1] # index of the S=2,mS=-2 ket
     S2mS0base=median(austrip.(pltdata[S2mS0index][2]))
     pltS2mS0=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS0index][1])),austrip.(pltdata[S2mS0index][2]),
-    minorticks=true, label=pltlabel[S2mS0index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS0index], legend=false,
     ylabel="σ(PI) (a₀²)", xlabel="B (G)",
     ylims=(-Inf,100))
     # plot S=2,mS=1
     S2mS1index = findall(x->x.S==2&&x.mS==1,unq)[1] # index of the S=2,mS=-2 ket
     S2mS1base=median(austrip.(pltdata[S2mS1index][2]))
     pltS2mS1=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS1index][1])),austrip.(pltdata[S2mS1index][2]),
-    minorticks=true, label=pltlabel[S2mS1index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS1index], legend=false,
     ylabel="σ(PI) (a₀²)", xlabel="B (G)",
     ylims=(-10,100))
     # plot S=2,mS=2
     S2mS2index = findall(x->x.S==2&&x.mS==2,unq)[1] # index of the S=2,mS=-2 ket
     S2mS2base=median(austrip.(pltdata[S2mS2index][2]))
     pltS2mS2=plot(10_000 .* ustrip.(uconvert.(u"T",pltdata[S2mS2index][1])),austrip.(pltdata[S2mS2index][2]),
-    minorticks=true, label=pltlabel[S2mS2index], legend=:outertopright,
+    minorticks=true, label=pltlabel[S2mS2index], legend=false,
     ylabel="σ(PI) (a₀²)", xlabel="B (G)",
     ylims=(-10,100))
     return pltS0, pltS2mSm2, pltS2mSm1, pltS2mS0, pltS2mS1, pltS2mS2
@@ -638,10 +645,10 @@ function diffB_I_plot(Bmin::Unitful.BField, Bmax::Unitful.BField,
 end
 
 ########################Fano fitting############################################
-using LsqFit
+using CurveFit
 """ Returns least squares fit of Fano profile to elastic cross section data,
     given a state γ, wavenumber k, and lmax (along with Bmin, Bmax fitting region)"""
-function fit_fano(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
+function nonlin_fano(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
     k::Union{typeof(0u"bohr^-1"),typeof(0e0u"bohr^-1")},lmax::Int)
     # load all data with correct B
     datas=load_data("gam",-(Inf)u"hartree",(Inf)u"hartree",Bmin,Bmax,lmax)
@@ -659,15 +666,116 @@ function fit_fano(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
         end
     end
     #p[1≡q, p[2]≡Δ, p[3]≡B₀
-    @. fano(𝐱, p) = (p[1]*p[2]/2+𝐱-p[3])^2/((p[2]/2)^2+(𝐱-p[3])^2) # Fano eqn
+    fano(x,p) = let
+        ϵ=2*(x-p[3])/p[2]
+        (ϵ+p[1])^2/(ϵ^2+1) # Fano eqn from wolfram demo
+    end
+    fano_err(xy, p) = xy[2] - fano(xy[1],p)
     # strip units before passing to fit
     Bs⁰=ustrip.(uconvert.(u"T",Bs)*10_000) # Bfields in G so Δ, B₀ in G
     σs⁰=austrip.(σs) # σ in a₀²
+    # normalise peak height
+    σs⁰ ./= maximum(σs⁰)
+    # move min to zero
+    xy=[Bs⁰ σs⁰]
     # parameter starting points
-    lb = [-Inf,0.0,125.0] # lower bounds
-    ub = [Inf,10.0,130.0]# upper bounds
-    q0=2.0; Δ0=1.0; B0=125.0 # Best guess (B field stuff in G)
-    p0=[q0,Δ0,B0] # initial parameters choice
-    fit = curve_fit(fano,Bs⁰,σs⁰,p0,lower=lb,upper=ub)
-    return fit, Bs⁰, σs⁰, fano(Bs⁰, coef(fit))
+    backgnd=(σs⁰[1]+σs⁰[end])/2
+    q0=30.1; Δ0=1e-4; B0=127.93 # Best guess (B field stuff in G)
+    p0=[q0,Δ0,B0,backgnd] # initial parameters choice
+    #plot(xy[:,1],xy[:,2]); return plot!(xy[:,1],[fano(i,p0) for i in xy[:,1]])
+    eps=1e-7; maxiter=2000;
+    coefs,converged,iter = nonlinear_fit(xy,fano_err,p0,eps,maxiter)
+end
+
+# linear fit
+function lin_fano(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
+    k::Union{typeof(0u"bohr^-1"),typeof(0e0u"bohr^-1")},lmax::Int)
+    # load all data with correct B
+    datas=load_data("gam",-(Inf)u"hartree",(Inf)u"hartree",Bmin,Bmax,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.B)) # sort by increasing Bfield
+    Bs::Array{Unitful.BField,1}=[]
+    σs::Array{typeof(0e0u"bohr^2"),1}=[]
+    for d in datas # already sorted datas by energy
+        if γ in d.γ_lookup # in case γ is closed in this data
+            dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+            # need match of energy to B field for this γ
+            d.ϵ==E∞(γ,k,d.B) || continue
+            push!(Bs,d.B) # store Bfield
+            push!(σs,d.σ[dγ_index,dγ_index]) # store elastic cross section
+        end
+    end
+    #p[1≡q, p[2]≡Δ, p[3]≡B₀
+    fano(x,p) = let
+        ϵ=2*(x-p[3])/p[2]
+        (ϵ+p[1])^2/(ϵ^2+1) # Fano eqn from wolfram demo
+    end
+    @. fano(𝐱,p) = (p[1]*p[2]/2 + 𝐱 - p[3])^2/((p[2]/2)^2+(𝐱-p[3])^2) + p[4]
+    # strip units before passing to fit
+    Bs⁰=ustrip.(uconvert.(u"T",Bs)*10_000) # Bfields in G so Δ, B₀ in G
+    σs⁰=austrip.(σs) # σ in a₀²
+    # normalise peak height
+    σs⁰ ./= maximum(σs⁰)
+    # estimate p[4]=background
+    backgnd=(σs⁰[1]+σs⁰[end])/2
+    # parameter starting points
+    q0=1.0; Δ0=0.0001; B0=127.93 # Best guess (B field stuff in G)
+    p0=[q0,Δ0,B0,backgnd] # initial parameters choice
+    #return xy, fano, p0
+    fit=LsqFit.curve_fit(fano,Bs⁰,σs⁰,p0)
+    plot(Bs⁰,σs⁰)
+    plot!(Bs⁰,fano(Bs⁰,coef(fit)))
+end
+
+using DelimitedFiles
+# script for saving unit-less Bfields, σₑₗ's for python fitting
+function saveBsσs(γ::γ_ket,Bmin::Unitful.BField,Bmax::Unitful.BField,
+    k::Union{typeof(0u"bohr^-1"),typeof(0e0u"bohr^-1")},lmax::Int)
+    # load all data with correct B
+    datas=load_data("I",-(Inf)u"hartree",(Inf)u"hartree",Bmin,Bmax,lmax)
+    @assert length(datas)>0 "Didn't find any suitable data"
+    sort!(datas, by=(x->x.B)) # sort by increasing Bfield
+    Bs::Array{Unitful.BField,1}=[]
+    σs::Array{typeof(0e0u"bohr^2"),1}=[]
+    for d in datas # already sorted datas by energy
+        if γ in d.γ_lookup # in case γ is closed in this data
+            dγ_index=findall(x->x==γ,d.γ_lookup)[1] # order of γ in σ array
+            # need match of energy to B field for this γ
+            d.ϵ==E∞(γ,k,d.B) || continue
+            push!(Bs,d.B) # store Bfield
+            push!(σs,d.σ[dγ_index]) # store elastic cross section
+        end
+    end
+    # convert Bs to Gauss and σs to a₀²
+    Bs=uconvert.(u"T",Bs)*10_000
+    σs=auconvert.(σs)
+    # strip units and form N×2 array
+    Bs⁰=ustrip.(Bs)
+    σs⁰=ustrip.(σs)
+    Bσ=[Bs⁰ σs⁰]
+    println("Saving $(length(Bs⁰)) data for S=$(γ.S), mS=$(γ.mS)")
+    prevdir=pwd()
+    cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Sem 2\October\mS-12-ion-decay")
+    writedlm("S$(γ.S)mS$(γ.mS)_Bmin$(ustrip(uconvert(u"T",Bmin)*10_000))G_Bmax$(ustrip(uconvert(u"T",Bmax)*10_000))_el_vs_B.csv", Bσ, ',')
+    cd(prevdir)
+    plot(Bs⁰,σs⁰)
+end
+
+######################produce potentials .csv for DC to check###################
+using Potentials
+function gridpotentials(S::Int)
+    @assert S in [0,1,2] "S not 0, 1, or 2"
+    Rs=LinRange(3,200,100_000)u"bohr"
+    if S==0
+        Vs=Singlet.(Rs)
+    elseif S==1
+        Vs=Triplet.(Rs)
+    else
+        Vs=Quintet.(Rs)
+    end
+    prevdir=pwd()
+    cd(raw"C:\Users\hirsc\OneDrive - Australian National University\PHYS4110\Sem 2\October\BOpots-values")
+    writedlm("S$S.csv", [austrip.(Rs) austrip.(Vs)], ',')
+    cd(prevdir)
+    plot(austrip.(Rs), austrip.(Vs))
 end
